@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('desktop', {
     ipcRenderer.on('stack:progress', listener);
     return () => ipcRenderer.removeListener('stack:progress', listener);
   },
+  pickFolder: () => ipcRenderer.invoke('desktop:pick-folder'),
   openExternal: (url) => ipcRenderer.invoke('desktop:open-external', url),
   openPath: (target) => ipcRenderer.invoke('desktop:open-path', target),
 });

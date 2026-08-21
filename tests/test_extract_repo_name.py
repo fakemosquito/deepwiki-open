@@ -57,6 +57,9 @@ class TestExtractRepoNameFromUrl:
             ("/home/user/projects/my-repo", "my-repo"),
             ("/var/repos/project.git", "project.git"),
             ("my-repo", "my-repo"),
+            (r"C:\Users\foo\my-repo", "my-repo"),
+            ("C:/Users/foo/my-repo", "my-repo"),
+            (r"C:\Users\foo\my-repo\\", "my-repo"),
         ],
     )
     def test_extract_repo_name_local_paths(self, repo_url, name):

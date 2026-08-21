@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { FaWikipediaW, FaGithub, FaCoffee, FaTwitter } from 'react-icons/fa';
+import { FaWikipediaW, FaGithub, FaCoffee, FaTwitter, FaFolderOpen } from 'react-icons/fa';
 import ThemeToggle from '@/components/theme-toggle';
 import Mermaid from '../components/Mermaid';
 import ConfigurationModal from '@/components/ConfigurationModal';
 import ProcessedProjects from '@/components/ProcessedProjects';
-import { extractUrlPath, extractUrlDomain } from '@/utils/urlDecoder';
+import { parseRepositoryInput } from '@/utils/parseRepositoryInput';
 import { useProcessedProjects } from '@/hooks/useProcessedProjects';
 
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -76,6 +76,7 @@ export default function Home() {
   };
 
   const [repositoryInput, setRepositoryInput] = useState('https://github.com/AsyncFuncAI/deepwiki-open');
+  const [canPickFolder, setCanPickFolder] = useState(false);
 
   const REPO_CONFIG_CACHE_KEY = 'deepwikiRepoConfigCache';
 
@@ -121,6 +122,10 @@ export default function Home() {
     }
   }, []);
 
+  useEffect(() => {
+    setCanPickFolder(typeof window.desktop?.pickFolder === 'function');
+  }, []);
+
   // Provider-based model selection state
   const [provider, setProvider] = useState<string>('');
   const [model, setModel] = useState<string>('');
@@ -144,6 +149,7 @@ export default function Home() {
   const [authRequired, setAuthRequired] = useState<boolean>(false);
   const [authCode, setAuthCode] = useState<string>('');
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
 
   // Sync the language context with the selectedLanguage state
   useEffect(() => {
@@ -173,93 +179,28 @@ export default function Home() {
     fetchAuthStatus();
   }, []);
 
-  // Parse repository URL/input and extract owner and repo
-  const parseRepositoryInput = (input: string): {
-    owner: string,
-    repo: string,
-    type: string,
-    fullPath?: string,
-    localPath?: string
-  } | null => {
-    input = input.trim();
+  const invalidRepoMessage = () =>
+    t('form.invalidRepo') ||
+    'Invalid repository format. Use "owner/repo", a GitHub/GitLab/BitBucket URL, or a local folder path like "C:\\path\\to\\folder" or "/path/to/folder".';
 
-    let owner = '', repo = '', type = 'github', fullPath;
-    let localPath: string | undefined;
-
-    // Handle Windows absolute paths (e.g., C:\path\to\folder)
-    const windowsPathRegex = /^[a-zA-Z]:\\(?:[^\\/:*?"<>|\r\n]+\\)*[^\\/:*?"<>|\r\n]*$/;
-    const customGitRegex = /^(?:https?:\/\/)?([^\/]+)\/(.+?)\/([^\/]+)(?:\.git)?\/?$/;
-
-    if (windowsPathRegex.test(input)) {
-      type = 'local';
-      localPath = input;
-      repo = input.split('\\').pop() || 'local-repo';
-      owner = 'local';
-    }
-    // Handle Unix/Linux absolute paths (e.g., /path/to/folder)
-    else if (input.startsWith('/')) {
-      type = 'local';
-      localPath = input;
-      repo = input.split('/').filter(Boolean).pop() || 'local-repo';
-      owner = 'local';
-    }
-    else if (customGitRegex.test(input)) {
-      // Detect repository type based on domain
-      const domain = extractUrlDomain(input);
-      if (domain?.includes('github.com')) {
-        type = 'github';
-      } else if (domain?.includes('gitlab.com') || domain?.includes('gitlab.')) {
-        type = 'gitlab';
-      } else if (domain?.includes('bitbucket.org') || domain?.includes('bitbucket.')) {
-        type = 'bitbucket';
-      } else {
-        type = 'web'; // fallback for other git hosting services
-      }
-
-      fullPath = extractUrlPath(input)?.replace(/\.git$/, '');
-      const parts = fullPath?.split('/') ?? [];
-      if (parts.length >= 2) {
-        repo = parts[parts.length - 1] || '';
-        owner = parts[parts.length - 2] || '';
-      }
-    }
-    // Unsupported URL formats
-    else {
-      console.error('Unsupported URL format:', input);
-      return null;
-    }
-
-    if (!owner || !repo) {
-      return null;
-    }
-
-    // Clean values
-    owner = owner.trim();
-    repo = repo.trim();
-
-    // Remove .git suffix if present
-    if (repo.endsWith('.git')) {
-      repo = repo.slice(0, -4);
-    }
-
-    return { owner, repo, type, fullPath, localPath };
+  const handlePickFolder = async () => {
+    const folder = await window.desktop?.pickFolder?.();
+    if (!folder) return;
+    setRepositoryInput(folder);
+    setError(null);
+    loadConfigFromCache(folder);
   };
-
-  // State for configuration modal
-  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Parse repository input to validate
     const parsedRepo = parseRepositoryInput(repositoryInput);
 
     if (!parsedRepo) {
-      setError('Invalid repository format. Use "owner/repo", GitHub/GitLab/BitBucket URL, or a local folder path like "/path/to/folder" or "C:\\path\\to\\folder".');
+      setError(invalidRepoMessage());
       return;
     }
 
-    // If valid, open the configuration modal
     setError(null);
     setIsConfigModalOpen(true);
   };
@@ -336,7 +277,7 @@ export default function Home() {
     const parsedRepo = parseRepositoryInput(repositoryInput);
 
     if (!parsedRepo) {
-      setError('Invalid repository format. Use "owner/repo", GitHub/GitLab/BitBucket URL, or a local folder path like "/path/to/folder" or "C:\\path\\to\\folder".');
+      setError(invalidRepoMessage());
       setIsSubmitting(false);
       return;
     }
@@ -348,13 +289,11 @@ export default function Home() {
     if (accessToken) {
       params.append('token', accessToken);
     }
-    // Always include the type parameter
     params.append('type', (type == 'local' ? type : selectedPlatform) || 'github');
-    // Add local path if it exists
     if (localPath) {
-      params.append('local_path', encodeURIComponent(localPath));
+      params.append('local_path', localPath);
     } else {
-      params.append('repo_url', encodeURIComponent(repositoryInput));
+      params.append('repo_url', repositoryInput);
     }
     // Add model parameters
     params.append('provider', provider);
@@ -385,7 +324,7 @@ export default function Home() {
     const queryString = params.toString() ? `?${params.toString()}` : '';
 
     // Navigate to the dynamic route
-    router.push(`/${owner}/${repo}${queryString}`);
+    router.push(`/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${queryString}`);
 
     // The isSubmitting state will be reset when the component unmounts during navigation
   };
@@ -421,7 +360,7 @@ export default function Home() {
                   type="text"
                   value={repositoryInput}
                   onChange={handleRepositoryInputChange}
-                  placeholder={t('form.repoPlaceholder') || "owner/repo, GitHub/GitLab/BitBucket URL, or local folder path"}
+                  placeholder={t('form.repoPlaceholder') || "owner/repo, Git URL, or local folder path"}
                   className="input-japanese block w-full pl-10 pr-3 py-2.5 border-[var(--border-color)] rounded-lg bg-transparent text-[var(--foreground)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />
                 {error && (
@@ -430,6 +369,17 @@ export default function Home() {
                   </div>
                 )}
               </div>
+              {canPickFolder && (
+                <button
+                  type="button"
+                  onClick={handlePickFolder}
+                  className="btn-japanese px-4 py-2.5 rounded-lg inline-flex items-center justify-center gap-2"
+                  title={t('form.browseFolder') || 'Browse folder'}
+                >
+                  <FaFolderOpen className="text-sm" />
+                  <span>{t('form.browseFolder') || 'Browse folder'}</span>
+                </button>
+              )}
               <button
                 type="submit"
                 className="btn-japanese px-6 py-2.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -472,6 +422,7 @@ export default function Home() {
             setIncludedFiles={setIncludedFiles}
             onSubmit={handleGenerateWiki}
             isSubmitting={isSubmitting}
+            isLocalRepository={parseRepositoryInput(repositoryInput)?.type === 'local'}
             authRequired={authRequired}
             authCode={authCode}
             setAuthCode={setAuthCode}
@@ -558,6 +509,10 @@ export default function Home() {
               <div
                 className="bg-[var(--background)]/70 p-3 rounded border border-[var(--border-color)] font-mono overflow-x-hidden whitespace-nowrap"
               >https://bitbucket.org/atlassian/atlaskit
+              </div>
+              <div
+                className="bg-[var(--background)]/70 p-3 rounded border border-[var(--border-color)] font-mono overflow-x-hidden whitespace-nowrap"
+              >{t('home.localPathExample') || 'C:\\Users\\you\\projects\\my-repo'}
               </div>
             </div>
           </div>

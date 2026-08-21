@@ -243,6 +243,23 @@ function startApi(python, env, logFile) {
 }
 
 function startWeb(node, env, logFile) {
+  if (!app.isPackaged) {
+    const nextBin = path.join(getAppRoot(), 'node_modules', 'next', 'dist', 'bin', 'next');
+    if (exists(nextBin)) {
+      webChild = spawnLogged(node, [nextBin, 'dev', '--port', String(FRONTEND_PORT)], {
+        cwd: getAppRoot(),
+        env: {
+          ...env,
+          NODE_ENV: 'development',
+          PORT: String(FRONTEND_PORT),
+        },
+        logFile,
+        name: 'web',
+      });
+      return;
+    }
+  }
+
   const serverJs = path.join(getWebRoot(), 'server.js');
   if (exists(serverJs)) {
     webChild = spawnLogged(node, [serverJs], {
@@ -258,28 +275,9 @@ function startWeb(node, env, logFile) {
     return;
   }
 
-  if (app.isPackaged) {
-    const error = new Error('RUNTIME_MISSING');
-    error.code = 'RUNTIME_MISSING';
-    throw error;
-  }
-
-  const nextBin = path.join(getAppRoot(), 'node_modules', 'next', 'dist', 'bin', 'next');
-  if (!exists(nextBin)) {
-    const error = new Error('NODE_MISSING');
-    error.code = 'NODE_MISSING';
-    throw error;
-  }
-  webChild = spawnLogged(node, [nextBin, 'dev', '--port', String(FRONTEND_PORT)], {
-    cwd: getAppRoot(),
-    env: {
-      ...env,
-      NODE_ENV: 'development',
-      PORT: String(FRONTEND_PORT),
-    },
-    logFile,
-    name: 'web',
-  });
+  const error = new Error(app.isPackaged ? 'RUNTIME_MISSING' : 'NODE_MISSING');
+  error.code = app.isPackaged ? 'RUNTIME_MISSING' : 'NODE_MISSING';
+  throw error;
 }
 
 async function startStack(emit) {

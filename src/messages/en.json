@@ -21,9 +21,10 @@
   "home": {
     "welcome": "Welcome to DeepWiki-Open",
     "welcomeTagline": "AI-powered documentation for your code repositories",
-    "description": "Generate comprehensive documentation from GitHub, GitLab, or Bitbucket repositories with just a few clicks.",
+    "description": "Generate comprehensive documentation from a local folder, or from GitHub, GitLab, or Bitbucket repositories.",
     "quickStart": "Quick Start",
-    "enterRepoUrl": "Enter a repository URL in one of these formats:",
+    "enterRepoUrl": "Enter a repository URL or local folder path in one of these formats:",
+    "localPathExample": "C:\\Users\\you\\projects\\my-repo",
     "advancedVisualization": "Advanced Visualization with Mermaid Diagrams",
     "diagramDescription": "DeepWiki automatically generates interactive diagrams to help you understand code structure and relationships:",
     "flowDiagram": "Flow Diagram",
@@ -32,7 +33,9 @@
   "form": {
     "repository": "Repository",
     "configureWiki": "Configure Wiki",
-    "repoPlaceholder": "owner/repo or GitHub/GitLab/Bitbucket URL",
+    "repoPlaceholder": "owner/repo, Git URL, or local folder path",
+    "browseFolder": "Browse folder",
+    "invalidRepo": "Invalid repository format. Use owner/repo, a GitHub/GitLab/Bitbucket URL, or a local folder path like C:\\path\\to\\folder.",
     "wikiLanguage": "Wiki Language",
     "modelOptions": "Model Options",
     "modelProvider": "Model Provider",

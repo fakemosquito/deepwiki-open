@@ -20,7 +20,7 @@ from api.schemas import (
     RepoInfo,
     TaskStatus,
 )
-from api.repository import Repo
+from api.repository import Repo, ensure_local_repo_available
 from api.rag import repo_index_exist
 from api.services.research import prepare_repo_index, research_chat
 from api.services.wiki import (
@@ -118,6 +118,7 @@ class WikiTask(BaseModel):
             wiki_structure=self.wiki_structure,
             error=self.error,
             submitted_at=self.submitted_at,
+            repo_url=r.repo_url,
         )
 
     def to_summary(self) -> WikiTaskSummary:
@@ -134,6 +135,7 @@ class WikiTask(BaseModel):
             current_page_ids=self.current_page_ids,
             error=self.error,
             submitted_at=self.submitted_at,
+            repo_url=r.repo_url,
         )
 
 
@@ -214,6 +216,7 @@ async def generate_repo_wiki(task: WikiTask) -> None:
     r = task.request
     try:
         repo = Repo(r.repo_url, r.type, access_token=r.token)
+        ensure_local_repo_available(repo)
 
         # Req 1.1: build the index only if it does not already exist.
         if not repo_index_exist(repo):
@@ -257,6 +260,9 @@ async def _save(
                 repo=task.request.repo,
                 type=task.request.type,
                 token=None,  # remove token from cache file
+                localPath=(
+                    task.request.repo_url if task.request.type == "local" else None
+                ),
                 repoUrl=task.request.repo_url,
             ),
             provider=task.request.provider,
@@ -321,6 +327,7 @@ async def _determine_structure(task: WikiTask) -> WikiStructureModel:
     """
     r = task.request
     repo = Repo(r.repo_url, r.type, access_token=r.token)
+    ensure_local_repo_available(repo)
     if not repo.is_local and not repo.downloaded:
         await asyncio.to_thread(repo.download)
 

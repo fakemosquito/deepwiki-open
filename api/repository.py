@@ -2,7 +2,7 @@ import os
 import subprocess
 from functools import wraps
 from collections.abc import Callable
-from urllib.parse import quote, urlparse, urlunparse
+from urllib.parse import quote, unquote, urlparse, urlunparse
 
 from git import Repo as GitRepo, GIT_OK, GitCommandError
 
@@ -137,6 +137,45 @@ def _path_is_url(path: str) -> bool:
         return False
 
 
+def normalize_repo_location(repo_url: str) -> str:
+    """Normalize a repository URL or local filesystem path.
+
+    Accepts quoted paths, ``file://`` URLs, and ``~`` home prefixes so desktop
+    users can paste Windows/Unix paths as they appear in Explorer.
+    """
+    text = (repo_url or "").strip().strip('"').strip("'")
+    if not text:
+        return text
+    if text.lower().startswith("file:"):
+        parsed = urlparse(text)
+        path = unquote(parsed.path or "")
+        if parsed.netloc and parsed.netloc not in {"", "localhost"}:
+            path = "\\\\" + parsed.netloc + path.replace("/", "\\")
+        elif len(path) >= 3 and path[0] == "/" and path[2] == ":":
+            path = path[1:]
+        text = path
+    if text.startswith("~"):
+        text = os.path.expanduser(text)
+    return text
+
+
+def _local_basename(path: str) -> str:
+    normalized = path.replace("\\", "/").rstrip("/")
+    name = normalized.split("/")[-1] if normalized else ""
+    return name or "local-repo"
+
+
+def ensure_local_repo_available(repo: "Repo") -> None:
+    """Raise a clear error when a local path cannot be read."""
+    if not repo.is_local:
+        return
+    path = repo.save_path
+    if not os.path.isdir(path):
+        raise FileNotFoundError(
+            f"Local repository path does not exist or is not a directory: {path}"
+        )
+
+
 class Repo:
     def __init__(
         self,
@@ -155,7 +194,7 @@ class Repo:
         access_token : str, optional
             The access token to use when cloning repository from a private git service.
         """
-        self.repo_url = repo_url
+        self.repo_url = normalize_repo_location(repo_url)
         self.repo_type = repo_type
 
         os.makedirs(root_path, exist_ok=True)
@@ -185,7 +224,7 @@ class Repo:
                 repo_name = url_parts[-1].replace(".git", "")
         else:
             # This is a local repository
-            repo_name = os.path.basename(repo_url)
+            repo_name = _local_basename(repo_url)
         return repo_name
 
     def download(self, force: bool = False) -> None:
@@ -218,7 +257,7 @@ class Repo:
     @property
     def save_path(self) -> str:
         if self.is_local:
-            return self.repo_url
+            return os.path.abspath(self.repo_url)
         return os.path.join(self.root_path, self.name)
 
     @property

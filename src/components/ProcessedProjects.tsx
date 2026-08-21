@@ -17,6 +17,7 @@ interface ProcessedProject {
   // Present for the merged tasks list: 'completed' for cached wikis, otherwise
   // a queued/in-progress task (pending | indexing | determining_structure | generating).
   status?: string;
+  repo_url?: string | null;
 }
 
 interface ProcessedProjectsProps {
@@ -75,6 +76,7 @@ export default function ProcessedProjects({
             language: task.language,
             submittedAt: task.submitted_at,
             status: task.status,
+            repo_url: task.repo_url,
           })),
         );
       } catch (e: unknown) {
@@ -106,6 +108,17 @@ export default function ProcessedProjects({
 
     return maxItems ? filtered.slice(0, maxItems) : filtered;
   }, [projects, searchQuery, maxItems]);
+
+  const projectHref = (project: ProcessedProject) => {
+    const params = new URLSearchParams({
+      type: project.repo_type,
+      language: project.language,
+    });
+    if (project.repo_type === 'local' && project.repo_url) {
+      params.set('local_path', project.repo_url);
+    }
+    return `/${encodeURIComponent(project.owner)}/${encodeURIComponent(project.repo)}?${params.toString()}`;
+  };
 
   const clearSearch = () => {
     setSearchQuery('');
@@ -217,7 +230,7 @@ export default function ProcessedProjects({
                   </button>
                 )}
                 <Link
-                  href={`/${project.owner}/${project.repo}?type=${project.repo_type}&language=${project.language}`}
+                  href={projectHref(project)}
                   className="block"
                 >
                   <h3 className="text-lg font-semibold text-[var(--link-color)] hover:underline mb-2 line-clamp-2">
@@ -252,7 +265,7 @@ export default function ProcessedProjects({
                   <FaTimes className="h-4 w-4" />
                 </button>
                 <Link
-                  href={`/${project.owner}/${project.repo}?type=${project.repo_type}&language=${project.language}`}
+                  href={projectHref(project)}
                   className="flex items-center justify-between"
                 >
                   <div className="flex-1 min-w-0">

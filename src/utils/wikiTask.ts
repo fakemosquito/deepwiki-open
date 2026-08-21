@@ -71,6 +71,7 @@ export interface WikiTaskSummaryDto {
   error?: string | null;
   submitted_at: number;
   name: string;
+  repo_url?: string | null;
 }
 
 export interface WikiTaskStatusDto extends WikiTaskSummaryDto {

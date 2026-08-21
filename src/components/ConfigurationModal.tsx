@@ -52,6 +52,7 @@ interface ConfigurationModalProps {
   // Form submission
   onSubmit: () => void;
   isSubmitting: boolean;
+  isLocalRepository?: boolean;
 
   // Authentication
   authRequired?: boolean;
@@ -91,6 +92,7 @@ export default function ConfigurationModal({
   setIncludedFiles,
   onSubmit,
   isSubmitting,
+  isLocalRepository = false,
   authRequired,
   authCode,
   setAuthCode,
@@ -232,15 +234,17 @@ export default function ConfigurationModal({
             </div>
 
             {/* Access token section using TokenInput component */}
-            <TokenInput
-              selectedPlatform={selectedPlatform}
-              setSelectedPlatform={setSelectedPlatform}
-              accessToken={accessToken}
-              setAccessToken={setAccessToken}
-              showTokenSection={showTokenSection}
-              onToggleTokenSection={() => setShowTokenSection(!showTokenSection)}
-              allowPlatformChange={true}
-            />
+            {!isLocalRepository && (
+              <TokenInput
+                selectedPlatform={selectedPlatform}
+                setSelectedPlatform={setSelectedPlatform}
+                accessToken={accessToken}
+                setAccessToken={setAccessToken}
+                showTokenSection={showTokenSection}
+                onToggleTokenSection={() => setShowTokenSection(!showTokenSection)}
+                allowPlatformChange={true}
+              />
+            )}
 
             {/* Authorization Code Input */}
             {isAuthLoading && (

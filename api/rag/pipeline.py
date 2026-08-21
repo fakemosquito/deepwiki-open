@@ -13,7 +13,7 @@ from api.config import (
     iterate_files,
 )
 from api.logger import get_logger
-from api.repository import Repo
+from api.repository import Repo, ensure_local_repo_available
 
 logger = get_logger(__name__)
 
@@ -363,7 +363,10 @@ class DatabaseManager:
                 access_token=access_token,
             )
             logger.info(f"Extracted repo name: {repo.name}")
-            if not repo.downloaded:
+            if repo.is_local:
+                ensure_local_repo_available(repo)
+                logger.info("Using local repository at %s", repo.save_path)
+            elif not repo.downloaded:
                 repo.download()
             else:
                 logger.info(

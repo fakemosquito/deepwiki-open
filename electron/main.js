@@ -251,6 +251,17 @@ ipcMain.handle('model:connect', async (_event, payload) => {
   }
 });
 
+ipcMain.handle('desktop:pick-folder', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win || undefined, {
+    properties: ['openDirectory'],
+  });
+  if (result.canceled || !result.filePaths[0]) {
+    return null;
+  }
+  return result.filePaths[0];
+});
+
 ipcMain.handle('desktop:open-external', (_event, url) => {
   if (typeof url === 'string' && /^https?:/i.test(url)) {
     return shell.openExternal(url);

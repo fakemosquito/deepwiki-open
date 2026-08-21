@@ -109,8 +109,8 @@ export default function RepoWikiPage() {
 
   // Extract tokens from search params
   const token = searchParams.get('token') || '';
-  const localPath = searchParams.get('local_path') ? decodeURIComponent(searchParams.get('local_path') || '') : undefined;
-  const repoUrl = searchParams.get('repo_url') ? decodeURIComponent(searchParams.get('repo_url') || '') : undefined;
+  const localPath = searchParams.get('local_path') || undefined;
+  const repoUrl = searchParams.get('repo_url') || undefined;
   const providerParam = searchParams.get('provider') || '';
   const modelParam = searchParams.get('model') || '';
   const isCustomModelParam = searchParams.get('is_custom_model') === 'true';
@@ -125,13 +125,15 @@ export default function RepoWikiPage() {
       return '';
     }
   })();
-  const repoType = repoHost?.includes('bitbucket')
-    ? 'bitbucket'
-    : repoHost?.includes('gitlab')
-      ? 'gitlab'
-      : repoHost?.includes('github')
-        ? 'github'
-        : searchParams.get('type') || 'github';
+  const repoType = localPath
+    ? 'local'
+    : repoHost?.includes('bitbucket')
+      ? 'bitbucket'
+      : repoHost?.includes('gitlab')
+        ? 'gitlab'
+        : repoHost?.includes('github')
+          ? 'github'
+          : searchParams.get('type') || 'github';
 
   // Import language context for translations
   const { messages } = useLanguage();
@@ -303,9 +305,19 @@ export default function RepoWikiPage() {
 
       // Update repoInfo
       if (cachedData.repo) {
-        setEffectiveRepoInfo(cachedData.repo);
+        const cachedRepo = cachedData.repo as RepoInfo;
+        if (cachedRepo.type === 'local' && !cachedRepo.localPath && cachedRepo.repoUrl) {
+          cachedRepo.localPath = cachedRepo.repoUrl;
+        }
+        setEffectiveRepoInfo(cachedRepo);
       } else if (cachedData.repo_url && !effectiveRepoInfo.repoUrl) {
-        const updatedRepoInfo = { ...effectiveRepoInfo, repoUrl: cachedData.repo_url };
+        const isLocal = effectiveRepoInfo.type === 'local';
+        const updatedRepoInfo = {
+          ...effectiveRepoInfo,
+          repoUrl: cachedData.repo_url,
+          localPath: isLocal ? (effectiveRepoInfo.localPath || cachedData.repo_url) : effectiveRepoInfo.localPath,
+        };
+        setEffectiveRepoInfo(updatedRepoInfo);
         setEffectiveRepoInfo(updatedRepoInfo); // Update effective repo info state
         console.log('Using cached repo_url:', cachedData.repo_url);
       }
@@ -480,8 +492,15 @@ export default function RepoWikiPage() {
 
     try {
       const model = isCustomSelectedModelState ? customSelectedModelState : selectedModelState;
+      const resolvedRepoUrl = getRepoUrl(effectiveRepoInfo);
+      if (!resolvedRepoUrl) {
+        setError(messages.repoPage?.errorMessageDefault || 'Missing repository URL or local folder path.');
+        setIsLoading(false);
+        setLoadingMessage(undefined);
+        return;
+      }
       const result = await submitWikiTask({
-        repo_url: getRepoUrl(effectiveRepoInfo),
+        repo_url: resolvedRepoUrl,
         type: effectiveRepoInfo.type,
         owner: effectiveRepoInfo.owner,
         repo: effectiveRepoInfo.repo,
@@ -964,7 +983,7 @@ export default function RepoWikiPage() {
                 {effectiveRepoInfo.type === 'local' ? (
                   <div className="flex items-center">
                     <FaFolder className="mr-2" />
-                    <span className="break-all">{effectiveRepoInfo.localPath}</span>
+                    <span className="break-all">{effectiveRepoInfo.localPath || effectiveRepoInfo.repoUrl}</span>
                   </div>
                 ) : (
                   <>

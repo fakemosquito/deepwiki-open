@@ -107,6 +107,18 @@ async def list_wiki_cache() -> list[WikiTaskSummary]:
             repo_type, owner, *repo, language = (
                 os.path.splitext(filename)[0].removeprefix(WIKI_PREFIX).split("_")
             )
+            repo_url = None
+            if repo_type == "local":
+                try:
+                    cache = await aload(WikiCacheData, file_path, encoding="utf-8")
+                    if cache.repo:
+                        repo_url = cache.repo.localPath or cache.repo.repoUrl
+                    elif cache.repo_url:
+                        repo_url = cache.repo_url
+                except Exception:
+                    logger.exception(
+                        "Could not restore local path from wiki cache %s", file_path
+                    )
             entries.append(
                 WikiTaskSummary(
                     id=filename,
@@ -116,6 +128,7 @@ async def list_wiki_cache() -> list[WikiTaskSummary]:
                     language=language,
                     submitted_at=int(stats.st_mtime * 1000),
                     status=TaskStatus.COMPLETED,
+                    repo_url=repo_url,
                 )
             )
         except Exception:

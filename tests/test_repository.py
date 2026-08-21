@@ -4,7 +4,7 @@ import os
 
 import git
 
-from api.repository import Repo
+from api.repository import Repo, ensure_local_repo_available, normalize_repo_location
 
 
 def test_repo_is_local():
@@ -83,3 +83,24 @@ def test_repo_download(repo_url, repo_type, tmpdir):
     repo.download()
 
     assert repo.downloaded
+
+
+def test_normalize_quoted_and_file_url():
+    assert normalize_repo_location(r'"C:\Users\foo\bar"') == r"C:\Users\foo\bar"
+    assert normalize_repo_location("file:///C:/Users/foo/bar") == "C:/Users/foo/bar"
+    assert normalize_repo_location("/home/user/project") == "/home/user/project"
+
+
+def test_local_save_path_uses_existing_directory():
+    path = os.path.dirname(os.path.abspath(__file__))
+    repo = Repo(repo_url=path, repo_type="local")
+    assert repo.is_local
+    assert os.path.normcase(os.path.abspath(repo.save_path)) == os.path.normcase(path)
+    ensure_local_repo_available(repo)
+
+
+def test_ensure_local_repo_missing_path():
+    missing = os.path.join(os.path.dirname(os.path.abspath(__file__)), "does-not-exist")
+    repo = Repo(repo_url=missing, repo_type="local")
+    with pytest.raises(FileNotFoundError, match="does not exist"):
+        ensure_local_repo_available(repo)

@@ -113,6 +113,7 @@ class WikiTaskSummary(BaseModel):
     current_page_ids: list[str] = Field(default_factory=list)
     error: str | None = None
     submitted_at: int = Field(..., ge=0, validation_alias="submittedAt")
+    repo_url: str | None = None
 
     @computed_field
     @property
