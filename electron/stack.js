@@ -222,7 +222,14 @@ function assertRuntime() {
 
 function startApi(python, env, logFile) {
   const cwd = app.isPackaged ? getRuntimeRoot() : getAppRoot();
-  apiChild = spawnLogged(python, ['-u', '-m', 'api.main'], {
+  // Embeddable CPython ships a python*._pth that enables isolated mode, so
+  // PYTHONPATH and cwd are ignored. Inject the module root before import.
+  const bootstrap = [
+    'import sys, runpy',
+    `sys.path.insert(0, ${JSON.stringify(cwd)})`,
+    "runpy.run_module('api.main', run_name='__main__')",
+  ].join('; ');
+  apiChild = spawnLogged(python, ['-u', '-c', bootstrap], {
     cwd,
     env,
     logFile,

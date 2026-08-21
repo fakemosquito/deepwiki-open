@@ -121,7 +121,7 @@ if (-not $SkipRuntime) {
     @"
 $pyZip
 .
-
+..
 Lib/site-packages
 import site
 "@ | Set-Content -Path $pth.FullName -Encoding ascii
