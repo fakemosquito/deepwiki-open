@@ -72,5 +72,12 @@ certs/
 /dist/desktop/
 electron/resources/*.tar
 electron/resources/*.tar.gz
+electron/resources/python/
+electron/resources/node/
+electron/resources/git/
+electron/resources/web/
+electron/resources/api/
+electron/resources/tiktoken_cache/
+electron/.cache/
 *.exe
 !electron/assets/

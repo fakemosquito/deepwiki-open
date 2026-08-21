@@ -5,8 +5,9 @@ Any patches and additional clients could be applied or imported in this module.
 from adalflow.components.model_client import (
     AzureAIClient,
     GoogleGenAIClient,
-    OpenAIClient,
 )
+
+from .openai import OpenAIClient
 
 from .anthropic import AnthropicBedrockClient
 from .bedrock import BedrockClient

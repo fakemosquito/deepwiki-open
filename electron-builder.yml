@@ -11,14 +11,16 @@ directories:
   buildResources: electron/assets
 files:
   - "**/*"
-  - "!resources/*.tar"
-  - "!resources/*.tar.gz"
+  - "!resources/**"
+  - "!.cache/**"
 extraResources:
   - from: electron/resources
     to: .
     filter:
       - "**/*"
       - "!README.txt"
+      - "!*.tar"
+      - "!*.tar.gz"
 win:
   icon: electron/assets/icon.ico
   signAndEditExecutable: false

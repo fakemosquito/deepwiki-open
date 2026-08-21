@@ -1,6 +1,12 @@
-This folder is copied into the Windows installer extraResources.
+This folder is filled by `scripts/build-win.ps1` and copied into the Windows installer extraResources.
 
-- docker-compose.yml is required.
-- deepwiki-open.tar is produced by `npm run dist:win` / `scripts/build-win.ps1`
-  (`docker build` + `docker save`). If the tar is absent, the app will try
-  to pull ghcr.io/asyncfuncai/deepwiki-open:latest at first launch.
+Packaged layout:
+
+- python/     portable CPython 3.11 + site-packages
+- node/       node.exe used to run the Next.js standalone server
+- git/        MinGit, used by GitPython to clone repositories
+- api/        FastAPI backend
+- web/        Next.js standalone output (server.js, .next, public)
+- tiktoken_cache/
+
+Docker is not used by the desktop app.

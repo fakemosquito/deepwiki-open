@@ -10,38 +10,9 @@ permissions:
   contents: read
 
 jobs:
-  export-image:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build application image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          load: true
-          tags: deepwiki-open:desktop
-          cache-from: type=gha,scope=desktop-win
-          cache-to: type=gha,mode=max,scope=desktop-win
-
-      - name: Save image tar
-        run: |
-          mkdir -p electron/resources
-          docker save deepwiki-open:desktop -o electron/resources/deepwiki-open.tar
-          ls -lh electron/resources/deepwiki-open.tar
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: deepwiki-image-tar
-          path: electron/resources/deepwiki-open.tar
-          retention-days: 5
-
   windows-installer:
-    needs: export-image
     runs-on: windows-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -50,18 +21,10 @@ jobs:
           node-version: 20
           cache: npm
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: deepwiki-image-tar
-          path: electron/resources
-
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: Build NSIS installer
+      - name: Build native Windows installer
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npx electron-builder --win nsis --publish never
+        run: powershell -ExecutionPolicy Bypass -File scripts/build-win.ps1
 
       - uses: actions/upload-artifact@v4
         with:

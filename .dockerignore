@@ -65,7 +65,5 @@ electron-builder.yml
 nsis/
 scripts/
 dist/
-Dockerfile.win-builder
 docker-compose.desktop.yml
-docker-compose.build-desktop.yml
 

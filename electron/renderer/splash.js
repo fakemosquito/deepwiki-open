@@ -1,85 +1,81 @@
 const I18N = {
   zh: {
     splashTitle: '正在启动 DeepWiki',
-    splashSubtitle: '桌面版会通过 Docker 启动 Wiki 服务',
-    setupTitle: '首次配置',
-    setupHint: '至少填写一个模型密钥，或填写本地 Ollama 地址。这些值会写入本机并注入 Docker 容器。',
-    googleKey: 'Google API Key',
-    openaiKey: 'OpenAI API Key',
-    openrouterKey: 'OpenRouter API Key',
-    ollamaHost: 'Ollama Host（可选）',
-    skipSetup: '稍后再说',
-    saveAndStart: '保存并启动',
-    dockerMissingTitle: '未检测到 Docker',
-    dockerMissingBody:
-      'DeepWiki 桌面版需要 Docker Desktop（Linux 容器）来运行后端与前端服务。安装完成后重新打开本应用即可。',
-    downloadDocker: '下载 Docker Desktop',
-    retry: '重新检测',
+    splashSubtitle: '桌面版会在本机启动 Wiki 前端与 API',
+    setupTitle: '连接模型',
+    setupHint:
+      '填写兼容 OpenAI 的 Base URL、密钥和对话模型。保存前会先测试连接，通过后再启动服务。',
+    baseUrl: 'Base URL',
+    apiKey: 'API Key',
+    model: 'Model',
+    embeddingModel: 'Embedding 模型（可选）',
+    saveAndStart: '连接并启动',
+    runtimeMissingTitle: '缺少运行组件',
+    runtimeMissingBody:
+      '未找到打包好的 Python / Node 运行时。请使用 scripts/build-win.ps1 重新打包后再安装。',
+    retry: '重试',
     errorTitle: '启动失败',
-    errorNoImage: '没有找到预置镜像，也无法拉取。请用打包脚本重新构建（docker build && docker save）。',
+    fillRequired: '请填写 Base URL、密钥和模型。',
+    invalidUrl: 'Base URL 需要以 http:// 或 https:// 开头。',
+    testing: '正在测试连接…',
+    connectTimeout: '连接超时，请检查 Base URL 或网络。',
+    connectNetwork: '无法连接到该地址，请检查 Base URL。',
+    connectFail: '连接失败',
     steps: {
-      'check-docker': '检查 Docker 环境',
-      'start-desktop': '启动 Docker Desktop',
-      'load-image': '导入应用镜像',
-      'pull-image': '拉取应用镜像',
-      'image-ready': '镜像已就绪',
-      compose: '启动服务容器',
+      'check-runtime': '检查运行环境',
+      'start-api': '启动 API 服务',
+      'start-web': '启动前端服务',
       health: '等待服务就绪',
       ready: '即将打开主界面',
     },
   },
   en: {
     splashTitle: 'Starting DeepWiki',
-    splashSubtitle: 'The desktop app boots the wiki stack with Docker',
-    setupTitle: 'First-run setup',
-    setupHint: 'Provide at least one model key, or an Ollama host. Values are stored locally and injected into Docker.',
-    googleKey: 'Google API Key',
-    openaiKey: 'OpenAI API Key',
-    openrouterKey: 'OpenRouter API Key',
-    ollamaHost: 'Ollama Host (optional)',
-    skipSetup: 'Skip for now',
-    saveAndStart: 'Save and start',
-    dockerMissingTitle: 'Docker not found',
-    dockerMissingBody:
-      'The desktop app needs Docker Desktop (Linux containers) to run the API and UI. Install it, then reopen DeepWiki.',
-    downloadDocker: 'Download Docker Desktop',
-    retry: 'Check again',
+    splashSubtitle: 'The desktop app starts the wiki UI and API on this machine',
+    setupTitle: 'Connect a model',
+    setupHint:
+      'Enter an OpenAI-compatible Base URL, API key, and chat model. The app tests the connection before starting.',
+    baseUrl: 'Base URL',
+    apiKey: 'API Key',
+    model: 'Model',
+    embeddingModel: 'Embedding model (optional)',
+    saveAndStart: 'Connect and start',
+    runtimeMissingTitle: 'Runtime not found',
+    runtimeMissingBody:
+      'The bundled Python / Node runtime is missing. Rebuild with scripts/build-win.ps1, then reinstall.',
+    retry: 'Try again',
     errorTitle: 'Failed to start',
-    errorNoImage: 'No bundled image was found and pulling failed. Rebuild with docker build && docker save.',
+    fillRequired: 'Please fill in Base URL, API key, and model.',
+    invalidUrl: 'Base URL must start with http:// or https://.',
+    testing: 'Testing connection…',
+    connectTimeout: 'Connection timed out. Check the Base URL or your network.',
+    connectNetwork: 'Could not reach that address. Check the Base URL.',
+    connectFail: 'Connection failed',
     steps: {
-      'check-docker': 'Checking Docker',
-      'start-desktop': 'Starting Docker Desktop',
-      'load-image': 'Loading application image',
-      'pull-image': 'Pulling application image',
-      'image-ready': 'Image ready',
-      compose: 'Starting containers',
+      'check-runtime': 'Checking runtime',
+      'start-api': 'Starting API',
+      'start-web': 'Starting frontend',
       health: 'Waiting for services',
       ready: 'Opening the app',
     },
   },
 };
 
-const STEP_ORDER = [
-  'check-docker',
-  'start-desktop',
-  'load-image',
-  'pull-image',
-  'image-ready',
-  'compose',
-  'health',
-  'ready',
-];
+const STEP_ORDER = ['check-runtime', 'start-api', 'start-web', 'health', 'ready'];
+const RUNTIME_CODES = new Set(['PYTHON_MISSING', 'NODE_MISSING', 'RUNTIME_MISSING']);
+const FIELDS = ['OPENAI_BASE_URL', 'OPENAI_API_KEY', 'OPENAI_MODEL', 'OPENAI_EMBEDDING_MODEL'];
 
 const $ = (id) => document.getElementById(id);
 const panels = {
   setup: $('setup'),
   progress: $('progress'),
-  dockerMissing: $('dockerMissing'),
+  runtimeMissing: $('runtimeMissing'),
   error: $('error'),
 };
 
 let strings = I18N.zh;
 let currentStep = '';
+let connecting = false;
 
 function show(name) {
   for (const [key, el] of Object.entries(panels)) {
@@ -87,21 +83,32 @@ function show(name) {
   }
 }
 
+function setStatus(text, kind) {
+  const el = $('setupStatus');
+  if (!text) {
+    el.hidden = true;
+    el.textContent = '';
+    el.className = 'status';
+    return;
+  }
+  el.hidden = false;
+  el.textContent = text;
+  el.className = `status ${kind || ''}`.trim();
+}
+
 function applyStrings() {
   $('title').textContent = strings.splashTitle;
   $('subtitle').textContent = strings.splashSubtitle;
   $('setupTitle').textContent = strings.setupTitle;
   $('setupHint').textContent = strings.setupHint;
-  $('labelGoogle').textContent = strings.googleKey;
-  $('labelOpenai').textContent = strings.openaiKey;
-  $('labelOpenrouter').textContent = strings.openrouterKey;
-  $('labelOllama').textContent = strings.ollamaHost;
-  $('skipBtn').textContent = strings.skipSetup;
+  $('labelBaseUrl').textContent = strings.baseUrl;
+  $('labelApiKey').textContent = strings.apiKey;
+  $('labelModel').textContent = strings.model;
+  $('labelEmbedding').textContent = strings.embeddingModel;
   $('saveBtn').textContent = strings.saveAndStart;
-  $('dockerMissingTitle').textContent = strings.dockerMissingTitle;
-  $('dockerMissingBody').textContent = strings.dockerMissingBody;
-  $('downloadDockerBtn').textContent = strings.downloadDocker;
-  $('retryBtn').textContent = strings.retry;
+  $('runtimeMissingTitle').textContent = strings.runtimeMissingTitle;
+  $('runtimeMissingBody').textContent = strings.runtimeMissingBody;
+  $('runtimeRetryBtn').textContent = strings.retry;
   $('errorTitle').textContent = strings.errorTitle;
   $('errorRetryBtn').textContent = strings.retry;
   renderSteps(currentStep);
@@ -127,18 +134,90 @@ function appendDetail(text) {
   log.scrollTop = log.scrollHeight;
 }
 
+function readForm() {
+  return {
+    OPENAI_BASE_URL: $('OPENAI_BASE_URL').value.trim(),
+    OPENAI_API_KEY: $('OPENAI_API_KEY').value.trim(),
+    OPENAI_MODEL: $('OPENAI_MODEL').value.trim(),
+    OPENAI_EMBEDDING_MODEL: $('OPENAI_EMBEDDING_MODEL').value.trim(),
+  };
+}
+
+function fillForm(keys) {
+  for (const field of FIELDS) {
+    $(field).value = keys?.[field] || '';
+  }
+}
+
+function hasConnection(keys) {
+  const k = keys || {};
+  return Boolean(
+    String(k.OPENAI_BASE_URL || '').trim() &&
+      String(k.OPENAI_API_KEY || '').trim() &&
+      String(k.OPENAI_MODEL || '').trim()
+  );
+}
+
+function connectErrorText(result) {
+  if (result?.code === 'INVALID') return strings.fillRequired;
+  if (result?.code === 'INVALID_URL') return strings.invalidUrl;
+  if (result?.code === 'TIMEOUT') return strings.connectTimeout;
+  if (result?.code === 'NETWORK') {
+    return result.message ? `${strings.connectNetwork} ${result.message}` : strings.connectNetwork;
+  }
+  if (result?.message) return `${strings.connectFail}：${result.message}`;
+  return strings.connectFail;
+}
+
 async function startApp() {
   show('progress');
-  renderSteps('check-docker');
+  renderSteps('check-runtime');
   const result = await window.desktop.start();
   if (result?.ok) return;
-  if (result?.code === 'DOCKER_UNAVAILABLE' && !result.dockerInstalled) {
-    show('dockerMissing');
+  if (RUNTIME_CODES.has(result?.code)) {
+    show('runtimeMissing');
     return;
   }
-  $('errorBody').textContent =
-    result?.code === 'NO_IMAGE' ? strings.errorNoImage : result?.message || strings.errorTitle;
+  $('errorBody').textContent = result?.message || strings.errorTitle;
   show('error');
+}
+
+async function connectAndStart() {
+  if (connecting) return;
+  const keys = readForm();
+  if (!hasConnection(keys)) {
+    show('setup');
+    setStatus(strings.fillRequired, 'error');
+    return;
+  }
+
+  connecting = true;
+  $('saveBtn').disabled = true;
+  show('setup');
+  setStatus(strings.testing, '');
+
+  try {
+    const result = await window.desktop.connect({ keys });
+    if (result?.ok) {
+      show('progress');
+      return;
+    }
+    if (RUNTIME_CODES.has(result?.code)) {
+      show('runtimeMissing');
+      return;
+    }
+    if (result?.code === 'START_FAILED') {
+      $('errorBody').textContent = result?.message || strings.errorTitle;
+      show('error');
+      return;
+    }
+    setStatus(connectErrorText(result), 'error');
+  } catch (error) {
+    setStatus(error.message || strings.connectFail, 'error');
+  } finally {
+    connecting = false;
+    $('saveBtn').disabled = false;
+  }
 }
 
 async function boot() {
@@ -151,12 +230,13 @@ async function boot() {
     window.desktop.getStatus(),
   ]);
 
-  const keyFields = ['GOOGLE_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'OLLAMA_HOST'];
-  for (const field of keyFields) {
-    $(field).value = config.keys?.[field] || '';
-  }
+  fillForm(config.keys);
 
   window.desktop.onProgress((payload) => {
+    if (payload?.step === 'open-settings') {
+      show('setup');
+      return;
+    }
     if (!payload?.step) return;
     currentStep = payload.step;
     show('progress');
@@ -164,13 +244,13 @@ async function boot() {
     appendDetail(payload.detail || '');
   });
 
-  if (!status.dockerReady && !status.dockerInstalled) {
-    show('dockerMissing');
+  if (!status.runtimeReady) {
+    show('runtimeMissing');
     return;
   }
 
-  const hasKey = keyFields.some((field) => (config.keys?.[field] || '').trim());
-  if (!hasKey) {
+  const openSettings = location.hash.replace('#', '') === 'settings';
+  if (openSettings || !hasConnection(config.keys)) {
     show('setup');
     return;
   }
@@ -178,25 +258,10 @@ async function boot() {
   await startApp();
 }
 
-$('saveBtn').addEventListener('click', async () => {
-  await window.desktop.setConfig({
-    keys: {
-      GOOGLE_API_KEY: $('GOOGLE_API_KEY').value.trim(),
-      OPENAI_API_KEY: $('OPENAI_API_KEY').value.trim(),
-      OPENROUTER_API_KEY: $('OPENROUTER_API_KEY').value.trim(),
-      OLLAMA_HOST: $('OLLAMA_HOST').value.trim(),
-    },
-  });
-  await startApp();
-});
-
-$('skipBtn').addEventListener('click', () => startApp());
-$('retryBtn').addEventListener('click', () => startApp());
-$('errorRetryBtn').addEventListener('click', () => startApp());
-$('downloadDockerBtn').addEventListener('click', () => {
-  window.desktop.openExternal(
-    'https://www.docker.com/products/docker-desktop/'
-  );
+$('saveBtn').addEventListener('click', () => connectAndStart());
+$('runtimeRetryBtn').addEventListener('click', () => startApp());
+$('errorRetryBtn').addEventListener('click', () => {
+  show('setup');
 });
 
 boot().catch((error) => {

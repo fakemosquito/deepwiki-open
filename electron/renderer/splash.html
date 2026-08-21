@@ -24,23 +24,23 @@
         <h2 id="setupTitle"></h2>
         <p id="setupHint" class="muted"></p>
         <label>
-          <span id="labelGoogle"></span>
-          <input id="GOOGLE_API_KEY" type="password" autocomplete="off" />
+          <span id="labelBaseUrl"></span>
+          <input id="OPENAI_BASE_URL" type="url" placeholder="https://api.openai.com/v1" autocomplete="off" />
         </label>
         <label>
-          <span id="labelOpenai"></span>
+          <span id="labelApiKey"></span>
           <input id="OPENAI_API_KEY" type="password" autocomplete="off" />
         </label>
         <label>
-          <span id="labelOpenrouter"></span>
-          <input id="OPENROUTER_API_KEY" type="password" autocomplete="off" />
+          <span id="labelModel"></span>
+          <input id="OPENAI_MODEL" type="text" placeholder="gpt-4o" autocomplete="off" />
         </label>
         <label>
-          <span id="labelOllama"></span>
-          <input id="OLLAMA_HOST" type="text" placeholder="http://host.docker.internal:11434" />
+          <span id="labelEmbedding"></span>
+          <input id="OPENAI_EMBEDDING_MODEL" type="text" placeholder="text-embedding-3-small" autocomplete="off" />
         </label>
+        <p id="setupStatus" class="status" hidden></p>
         <div class="actions">
-          <button id="skipBtn" type="button" class="ghost"></button>
           <button id="saveBtn" type="button" class="primary"></button>
         </div>
       </section>
@@ -50,12 +50,11 @@
         <pre id="detail" class="log"></pre>
       </section>
 
-      <section id="dockerMissing" class="panel hidden">
-        <h2 id="dockerMissingTitle"></h2>
-        <p id="dockerMissingBody" class="muted"></p>
+      <section id="runtimeMissing" class="panel hidden">
+        <h2 id="runtimeMissingTitle"></h2>
+        <p id="runtimeMissingBody" class="muted"></p>
         <div class="actions">
-          <button id="downloadDockerBtn" type="button" class="primary"></button>
-          <button id="retryBtn" type="button" class="ghost"></button>
+          <button id="runtimeRetryBtn" type="button" class="ghost"></button>
         </div>
       </section>
 

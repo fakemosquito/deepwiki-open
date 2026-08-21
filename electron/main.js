@@ -1,8 +1,15 @@
 const { app, BrowserWindow, ipcMain, Menu, shell, dialog } = require('electron');
 const path = require('path');
 const { t, resolveLocale } = require('./i18n');
-const { readSettings, writeSettings, hasAnyApiKey, getUserDataPaths, FRONTEND_PORT } = require('./paths');
-const docker = require('./docker');
+const { testModelConnection } = require('./connect');
+const {
+  readSettings,
+  writeSettings,
+  hasModelConnection,
+  getUserDataPaths,
+  FRONTEND_PORT,
+} = require('./paths');
+const stack = require('./stack');
 
 let splashWindow = null;
 let mainWindow = null;
@@ -14,10 +21,18 @@ function locale() {
   return resolveLocale(settings.locale || app.getLocale());
 }
 
-function createSplashWindow() {
+function createSplashWindow(mode = '') {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.focus();
+    if (mode === 'settings') {
+      splashWindow.webContents.send('stack:progress', { step: 'open-settings' });
+    }
+    return splashWindow;
+  }
+
   splashWindow = new BrowserWindow({
     width: 560,
-    height: 720,
+    height: 760,
     resizable: false,
     maximizable: false,
     fullscreenable: false,
@@ -33,11 +48,14 @@ function createSplashWindow() {
     },
   });
 
-  splashWindow.loadFile(path.join(__dirname, 'renderer', 'splash.html'));
+  splashWindow.loadFile(path.join(__dirname, 'renderer', 'splash.html'), {
+    hash: mode === 'settings' ? 'settings' : '',
+  });
   splashWindow.once('ready-to-show', () => splashWindow?.show());
   splashWindow.on('closed', () => {
     splashWindow = null;
   });
+  return splashWindow;
 }
 
 function createMainWindow() {
@@ -81,14 +99,14 @@ function createMainWindow() {
 }
 
 function emitProgress(payload) {
-  splashWindow?.webContents.send('docker:progress', payload);
+  splashWindow?.webContents.send('stack:progress', payload);
 }
 
 async function startServices() {
   if (starting) return { ok: true, busy: true };
   starting = true;
   try {
-    await docker.startStack(emitProgress);
+    await stack.startStack(emitProgress);
     createMainWindow();
     return { ok: true };
   } catch (error) {
@@ -96,7 +114,6 @@ async function startServices() {
       ok: false,
       code: error.code || 'START_FAILED',
       message: error.message,
-      dockerInstalled: error.dockerInstalled,
     };
   } finally {
     starting = false;
@@ -111,21 +128,15 @@ function buildMenu() {
       submenu: [
         {
           label: t(lang, 'settings'),
-          click: () => {
-            splashWindow?.focus();
-            if (!splashWindow) {
-              createSplashWindow();
-            }
-            splashWindow?.webContents.send('docker:progress', { step: 'open-settings' });
-          },
+          click: () => createSplashWindow('settings'),
         },
         {
           label: t(lang, 'restart'),
           click: async () => {
             createSplashWindow();
-            emitProgress({ step: 'check-docker' });
+            emitProgress({ step: 'check-runtime' });
             try {
-              await docker.restartStack(emitProgress);
+              await stack.restartStack(emitProgress);
               createMainWindow();
             } catch (error) {
               dialog.showErrorBox(t(lang, 'errorTitle'), error.message);
@@ -148,9 +159,9 @@ function buildMenu() {
       label: t(lang, 'helpMenu'),
       submenu: [
         {
-          label: t(lang, 'dockerDocs'),
+          label: t(lang, 'projectHome'),
           click: () =>
-            shell.openExternal('https://docs.docker.com/desktop/setup/install/windows-install/'),
+            shell.openExternal('https://github.com/AsyncFuncAI/deepwiki-open'),
         },
       ],
     },
@@ -184,13 +195,11 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', async (event) => {
   if (quitting) return;
-  const settings = readSettings();
-  if (!settings.stopContainersOnQuit) return;
   event.preventDefault();
   quitting = true;
   const timer = setTimeout(() => app.exit(0), 15000);
   try {
-    await docker.stopStack();
+    await stack.stopStack();
   } finally {
     clearTimeout(timer);
     app.exit(0);
@@ -203,14 +212,44 @@ ipcMain.handle('config:get', () => readSettings());
 
 ipcMain.handle('config:set', (_event, config) => writeSettings(config || {}));
 
-ipcMain.handle('docker:status', async () => ({
-  ...docker.getStatus(),
-  dockerReady: await docker.dockerAvailable(),
-  stackReady: await docker.isStackReady(),
-  hasApiKey: hasAnyApiKey(readSettings().keys),
+ipcMain.handle('stack:status', async () => ({
+  ...stack.getStatus(),
+  stackReady: await stack.isStackReady(),
+  hasModelConnection: hasModelConnection(readSettings().keys),
 }));
 
-ipcMain.handle('docker:start', () => startServices());
+ipcMain.handle('stack:start', () => startServices());
+
+ipcMain.handle('model:test', (_event, payload) => testModelConnection(payload || {}));
+
+ipcMain.handle('model:connect', async (_event, payload) => {
+  const keys = payload?.keys || payload || {};
+  const test = await testModelConnection(keys);
+  if (!test.ok) return test;
+  writeSettings({ keys });
+  if (starting) return { ok: true, busy: true };
+  starting = true;
+  try {
+    await stack.restartStack(emitProgress);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.reload();
+      mainWindow.show();
+      mainWindow.focus();
+      splashWindow?.close();
+    } else {
+      createMainWindow();
+    }
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      code: error.code || 'START_FAILED',
+      message: error.message,
+    };
+  } finally {
+    starting = false;
+  }
+});
 
 ipcMain.handle('desktop:open-external', (_event, url) => {
   if (typeof url === 'string' && /^https?:/i.test(url)) {
