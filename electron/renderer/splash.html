@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DeepWiki</title>
+    <link rel="stylesheet" href="./splash.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="brand">
+        <img src="./icon.png" alt="DeepWiki" class="logo" />
+        <div>
+          <h1 id="title">DeepWiki</h1>
+          <p id="subtitle" class="muted"></p>
+        </div>
+      </header>
+
+      <section id="setup" class="panel hidden">
+        <h2 id="setupTitle"></h2>
+        <p id="setupHint" class="muted"></p>
+        <label>
+          <span id="labelGoogle"></span>
+          <input id="GOOGLE_API_KEY" type="password" autocomplete="off" />
+        </label>
+        <label>
+          <span id="labelOpenai"></span>
+          <input id="OPENAI_API_KEY" type="password" autocomplete="off" />
+        </label>
+        <label>
+          <span id="labelOpenrouter"></span>
+          <input id="OPENROUTER_API_KEY" type="password" autocomplete="off" />
+        </label>
+        <label>
+          <span id="labelOllama"></span>
+          <input id="OLLAMA_HOST" type="text" placeholder="http://host.docker.internal:11434" />
+        </label>
+        <div class="actions">
+          <button id="skipBtn" type="button" class="ghost"></button>
+          <button id="saveBtn" type="button" class="primary"></button>
+        </div>
+      </section>
+
+      <section id="progress" class="panel hidden">
+        <ol id="steps"></ol>
+        <pre id="detail" class="log"></pre>
+      </section>
+
+      <section id="dockerMissing" class="panel hidden">
+        <h2 id="dockerMissingTitle"></h2>
+        <p id="dockerMissingBody" class="muted"></p>
+        <div class="actions">
+          <button id="downloadDockerBtn" type="button" class="primary"></button>
+          <button id="retryBtn" type="button" class="ghost"></button>
+        </div>
+      </section>
+
+      <section id="error" class="panel hidden">
+        <h2 id="errorTitle"></h2>
+        <p id="errorBody" class="muted"></p>
+        <div class="actions">
+          <button id="errorRetryBtn" type="button" class="primary"></button>
+        </div>
+      </section>
+    </main>
+    <script src="./splash.js"></script>
+  </body>
+</html>

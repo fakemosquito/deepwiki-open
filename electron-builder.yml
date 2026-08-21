@@ -1,0 +1,41 @@
+appId: ai.asyncfunc.deepwiki
+productName: DeepWiki
+copyright: MIT
+asar: true
+npmRebuild: false
+nodeGypRebuild: false
+buildDependenciesFromSource: false
+directories:
+  app: electron
+  output: dist/desktop
+  buildResources: electron/assets
+files:
+  - "**/*"
+  - "!resources/*.tar"
+  - "!resources/*.tar.gz"
+extraResources:
+  - from: electron/resources
+    to: .
+    filter:
+      - "**/*"
+      - "!README.txt"
+win:
+  icon: electron/assets/icon.ico
+  signAndEditExecutable: false
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: DeepWiki-Setup-${version}.exe
+  requestedExecutionLevel: asInvoker
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  allowElevation: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: DeepWiki
+  include: nsis/installer.nsh
+  deleteAppDataOnUninstall: false
+  unicode: true

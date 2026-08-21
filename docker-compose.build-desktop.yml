@@ -1,0 +1,24 @@
+services:
+  export-image:
+    image: docker:27-cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/workspace
+    working_dir: /workspace
+    command: >
+      sh -c "docker build -t deepwiki-open:desktop . &&
+      mkdir -p electron/resources &&
+      docker save deepwiki-open:desktop -o electron/resources/deepwiki-open.tar &&
+      ls -lh electron/resources/deepwiki-open.tar"
+
+  win-installer:
+    image: electronuserland/builder:20-wine
+    working_dir: /project
+    volumes:
+      - .:/project
+    environment:
+      ELECTRON_CACHE: /root/.cache/electron
+      ELECTRON_BUILDER_CACHE: /root/.cache/electron-builder
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    command: >
+      bash -c "npm ci --legacy-peer-deps && npx electron-builder --win nsis --publish never"

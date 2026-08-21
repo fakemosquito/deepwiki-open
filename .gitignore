@@ -67,3 +67,10 @@ next-env.d.ts
 
 # ignore adding self-signed certs
 certs/
+
+# Electron / desktop installer
+/dist/desktop/
+electron/resources/*.tar
+electron/resources/*.tar.gz
+*.exe
+!electron/assets/

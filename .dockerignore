@@ -58,3 +58,14 @@ LICENSE
 screenshots/
 *.md
 !api/README.md
+
+# Desktop packaging (not needed inside the app image)
+electron/
+electron-builder.yml
+nsis/
+scripts/
+dist/
+Dockerfile.win-builder
+docker-compose.desktop.yml
+docker-compose.build-desktop.yml
+

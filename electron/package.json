@@ -1,0 +1,9 @@
+{
+  "name": "deepwiki-desktop",
+  "productName": "DeepWiki",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeepWiki desktop - generate interactive wikis for Git repositories",
+  "author": "DeepWiki",
+  "main": "main.js"
+}

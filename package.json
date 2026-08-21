@@ -2,11 +2,18 @@
   "name": "deepwiki-open",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.js",
+  "description": "DeepWiki desktop - generate interactive wikis for Git repositories",
+  "author": "DeepWiki",
   "scripts": {
     "dev": "next dev --turbopack --port 3000",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "electron:dev": "electron .",
+    "dist:win": "powershell -ExecutionPolicy Bypass -File scripts/build-win.ps1",
+    "dist:win:skip-image": "powershell -ExecutionPolicy Bypass -File scripts/build-win.ps1 -SkipImage",
+    "dist:win:docker": "docker compose -f docker-compose.build-desktop.yml run --rm export-image && docker compose -f docker-compose.build-desktop.yml run --rm win-installer"
   },
   "dependencies": {
     "mermaid": "^11.4.1",
@@ -31,6 +38,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "electron": "^35.1.5",
+    "electron-builder": "^26.0.12",
     "eslint": "^10.8.0",
     "eslint-config-next": "^16.2.12",
     "tailwindcss": "^4",
