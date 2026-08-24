@@ -8,5 +8,6 @@ Packaged layout:
 - api/        FastAPI backend
 - web/        Next.js standalone output (server.js, .next, public)
 - tiktoken_cache/
+- fastembed_cache/  ONNX embedding model (BGE), so wiki indexing works offline
 
 Docker is not used by the desktop app.

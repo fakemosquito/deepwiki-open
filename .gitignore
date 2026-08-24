@@ -81,6 +81,7 @@ electron/resources/git/
 electron/resources/web/
 electron/resources/api/
 electron/resources/tiktoken_cache/
+electron/resources/fastembed_cache/
 electron/.cache/
 *.exe
 !electron/assets/

@@ -171,7 +171,7 @@ function runtimeEnv(paths) {
     TIKTOKEN_CACHE_DIR: path.join(getRuntimeRoot(), 'tiktoken_cache'),
     DEEPWIKI_CONFIG_DIR: paths.configDir,
     DEEPWIKI_EMBEDDER_TYPE: 'local',
-    FASTEMBED_CACHE_PATH: path.join(paths.root, 'models'),
+    FASTEMBED_CACHE_PATH: getFastembedCachePath(paths),
     HOME: paths.root,
     USERPROFILE: paths.root,
     PYTHONUTF8: '1',
@@ -192,6 +192,18 @@ function runtimeEnv(paths) {
     env.GIT_PYTHON_GIT_EXECUTABLE = git;
   }
   return env;
+}
+
+function getFastembedCachePath(paths) {
+  const bundled = path.join(getRuntimeRoot(), 'fastembed_cache');
+  if (exists(bundled)) {
+    try {
+      if (fs.readdirSync(bundled).length > 0) return bundled;
+    } catch {
+      // fall through to the user-data cache
+    }
+  }
+  return path.join(paths.root, 'models');
 }
 
 function assertRuntime() {

@@ -158,6 +158,9 @@ class LocalEmbedderClient(ModelClient):
 
 
 def _default_cache_dir() -> Path:
+    env = (os.environ.get("FASTEMBED_CACHE_PATH") or "").strip()
+    if env:
+        return Path(env)
     return Path.home() / ".cache" / "fastembed"
 
 

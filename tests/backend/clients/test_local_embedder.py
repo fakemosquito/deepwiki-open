@@ -42,6 +42,38 @@ def test_assert_embedder_ready_accepts_local_client(monkeypatch):
     assert_embedder_ready(Wrapper())
 
 
+def test_ensure_local_model_files_skips_download_when_cached(tmp_path, monkeypatch):
+    from api.clients.local_embedder import (
+        DEFAULT_MODEL,
+        HF_REPO,
+        MODEL_FILES,
+        ensure_local_model_files,
+    )
+
+    dest = tmp_path / HF_REPO[DEFAULT_MODEL].replace("/", "--")
+    dest.mkdir()
+    for name in MODEL_FILES:
+        payload = b"x" * 2000 if name.endswith(".onnx") else b"{}"
+        (dest / name).write_bytes(payload)
+
+    monkeypatch.setattr(
+        "api.clients.local_embedder._http_download",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("offline cache should not download")
+        ),
+    )
+
+    result = ensure_local_model_files(DEFAULT_MODEL, str(tmp_path))
+    assert result == dest
+
+
+def test_default_cache_dir_uses_fastembed_env(tmp_path, monkeypatch):
+    from api.clients import local_embedder
+
+    monkeypatch.setenv("FASTEMBED_CACHE_PATH", str(tmp_path))
+    assert local_embedder._default_cache_dir() == tmp_path
+
+
 def test_local_embedder_rejects_non_embedder_type():
     client = LocalEmbedderClient()
     with pytest.raises(ValueError, match="EMBEDDER"):

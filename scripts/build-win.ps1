@@ -38,6 +38,7 @@ $gitDir = Join-Path $resources "git"
 $webDir = Join-Path $resources "web"
 $apiDir = Join-Path $resources "api"
 $tiktokenDir = Join-Path $resources "tiktoken_cache"
+$fastembedDir = Join-Path $resources "fastembed_cache"
 
 function Assert-Command($name) {
   if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
@@ -69,8 +70,21 @@ function Copy-VcRuntime($destDir) {
   $sys = Join-Path $env:WINDIR "System32"
   foreach ($name in $names) {
     $src = Join-Path $sys $name
-    if (Test-Path $src) {
-      Copy-Item $src (Join-Path $destDir $name) -Force
+    $dst = Join-Path $destDir $name
+    if (-not (Test-Path $src)) { continue }
+    if (Test-Path $dst) {
+      $srcItem = Get-Item $src
+      $dstItem = Get-Item $dst
+      if ($srcItem.Length -eq $dstItem.Length) { continue }
+    }
+    try {
+      Copy-Item $src $dst -Force
+    } catch {
+      if (Test-Path $dst) {
+        Write-Host "Skipping locked $name (already present)"
+      } else {
+        throw
+      }
     }
   }
 }
@@ -176,6 +190,15 @@ import site
   $env:TIKTOKEN_CACHE_DIR = $tiktokenDir
   & $pythonExe -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
   if ($LASTEXITCODE -ne 0) { throw "tiktoken cache warmup failed" }
+
+  Write-Host "==> Bundling local embedding model for offline use"
+  New-Item -ItemType Directory -Force -Path $fastembedDir | Out-Null
+  $env:FASTEMBED_CACHE_PATH = $fastembedDir
+  $embedWarmup = "import sys; sys.path.insert(0, r'$root'); from api.clients.local_embedder import DEFAULT_MODEL, ensure_local_model_files, _load_text_embedding; dest = ensure_local_model_files(DEFAULT_MODEL, r'$fastembedDir'); _load_text_embedding(DEFAULT_MODEL, r'$fastembedDir'); print(dest)"
+  & $pythonExe -c $embedWarmup
+  if ($LASTEXITCODE -ne 0) { throw "local embedding model warmup failed" }
+  $onnx = Get-ChildItem -Path $fastembedDir -Recurse -Filter "model_optimized.onnx" | Select-Object -First 1
+  if (-not $onnx) { throw "Bundled embedding model missing under $fastembedDir" }
 
   Write-Host "==> Bundling portable Node $nodeVersion"
   New-Item -ItemType Directory -Force -Path $nodeDir | Out-Null
