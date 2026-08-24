@@ -111,6 +111,7 @@
     "embeddingErrorDefault": "Esto es un fallo de embeddings, no un problema de URL del repositorio. Generar el wiki requiere POST /embeddings. Compruebe el nombre del modelo de embedding y que el proveedor exponga ese endpoint.",
     "backToHome": "Volver al Inicio",
     "exportWiki": "Exportar Wiki",
+    "exportAsHtml": "Exportar como página web local",
     "exportAsMarkdown": "Exportar como Markdown",
     "exportAsJson": "Exportar como JSON",
     "pages": "Páginas",

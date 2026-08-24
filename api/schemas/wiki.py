@@ -75,8 +75,8 @@ class WikiExportRequest(BaseModel):
 
     repo_url: str = Field(..., description="URL of the repository")
     pages: list[WikiPage] = Field(..., description="List of wiki pages to export")
-    format: Literal["markdown", "json"] = Field(
-        ..., description="Export format (markdown or json)"
+    format: Literal["markdown", "json", "html"] = Field(
+        ..., description="Export format (markdown, json, or html)"
     )
 
 

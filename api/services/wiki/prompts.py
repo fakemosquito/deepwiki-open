@@ -66,6 +66,11 @@ Based ONLY on the content of the `[RELEVANT_SOURCE_FILES]`:
        - Use "graph TD" (top-down) directive for flow diagrams
        - NEVER use "graph LR" (left-right)
        - Maximum node width should be 3-4 words
+       - For flow diagrams (graph TD / flowchart TD), ONLY use flowchart arrows:
+         --> (arrow), --- (line), -.-> (dotted), ==> (thick)
+       - NEVER use sequence-diagram arrows (->> , -->>) inside graph/flowchart — they cause parse errors
+       - If a node label contains /, (), or other punctuation, wrap it in double quotes:
+         E["文件读写/图片资源"]
        - For sequence diagrams:
          - Start with "sequenceDiagram" directive on its own line
          - Define ALL participants at the beginning using "participant" keyword

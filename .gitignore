@@ -81,3 +81,6 @@ electron/resources/tiktoken_cache/
 electron/.cache/
 *.exe
 !electron/assets/
+
+# Large browser bundles inlined into offline wiki HTML at export time
+api/services/wiki/vendor/mermaid.min.js

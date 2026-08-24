@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeepWiki</title>
+  __VENDOR_SCRIPTS__
+  <style>
+    :root {
+      --bg: #f8f5f2;
+      --card: #fffdf9;
+      --fg: #242220;
+      --muted: #746c64;
+      --border: #e4dcd2;
+      --accent: #9a3412;
+      --accent-soft: rgba(154, 52, 18, 0.1);
+      --code-bg: #f3eee8;
+      --sidebar: #f3eee8;
+      --shadow: 0 10px 30px rgba(36, 34, 32, 0.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #161412;
+        --card: #1e1b18;
+        --fg: #f4eee7;
+        --muted: #b3a89c;
+        --border: #3a342e;
+        --accent: #e8b298;
+        --accent-soft: rgba(232, 178, 152, 0.12);
+        --code-bg: #12100e;
+        --sidebar: #1a1714;
+        --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100%;
+    }
+    .sidebar {
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      padding: 20px 16px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+    }
+    .brand { font-family: Georgia, "Times New Roman", serif; font-size: 18px; margin: 0 0 4px; }
+    .repo {
+      color: var(--muted);
+      font-size: 12px;
+      word-break: break-all;
+      margin-bottom: 16px;
+    }
+    .search {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--fg);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 14px;
+    }
+    .nav-title {
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 8px 0;
+    }
+    .page-btn {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      color: var(--fg);
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 4px;
+    }
+    .page-btn:hover, .page-btn.active { background: var(--accent-soft); color: var(--accent); }
+    .importance {
+      font-size: 10px;
+      margin-left: 6px;
+      color: var(--muted);
+    }
+    .main { padding: 28px 36px 64px; }
+    .article {
+      max-width: 920px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 32px;
+      box-shadow: var(--shadow);
+    }
+    .prose h1, .prose h2, .prose h3, .prose h4 { font-family: Georgia, "Times New Roman", serif; }
+    .prose h1 { font-size: 28px; margin-top: 0; }
+    .prose h2 { font-size: 22px; margin-top: 32px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    .prose p, .prose li { line-height: 1.75; }
+    .prose a { color: var(--accent); }
+    .prose code {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.9em;
+    }
+    .prose pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      overflow: auto;
+    }
+    .prose pre code { border: 0; background: transparent; padding: 0; }
+    .prose table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+    .prose th, .prose td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+    .prose th { background: var(--sidebar); }
+    .prose blockquote {
+      border-left: 4px solid var(--accent);
+      margin: 16px 0;
+      padding: 4px 14px;
+      color: var(--muted);
+    }
+    .mermaid-mount, .mermaid-fallback {
+      background: var(--code-bg);
+      border-radius: 12px;
+      padding: 16px;
+      overflow: auto;
+      margin: 18px 0;
+    }
+    .mermaid-mount svg { max-width: 100%; height: auto; }
+    .meta-block { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .chip {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--accent-soft);
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .file-chip {
+      cursor: default;
+      background: var(--code-bg);
+      color: var(--muted);
+    }
+    .empty { color: var(--muted); padding: 48px 0; text-align: center; }
+    .menu-btn {
+      display: none;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--fg);
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+    @media (max-width: 860px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar {
+        position: fixed;
+        z-index: 20;
+        width: min(86vw, 320px);
+        transform: translateX(-110%);
+        transition: transform 0.2s ease;
+      }
+      .sidebar.open { transform: translateX(0); }
+      .menu-btn { display: inline-block; }
+      .main { padding: 16px; }
+      .article { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <h1 class="brand">DeepWiki</h1>
+      <div class="repo" id="repo-label"></div>
+      <input class="search" id="search" type="search" placeholder="搜索页面..." />
+      <div class="nav-title" id="pages-label">Pages</div>
+      <nav id="nav"></nav>
+    </aside>
+    <main class="main">
+      <button class="menu-btn" id="menu-btn" type="button">目录</button>
+      <article class="article" id="article"></article>
+    </main>
+  </div>
+  <script id="wiki-data" type="application/json">__WIKI_DATA__</script>
+  <script>
+    const data = JSON.parse(document.getElementById("wiki-data").textContent);
+    const pages = data.pages || [];
+    const byId = Object.fromEntries(pages.map((page) => [page.id, page]));
+    const repoLabel = data.metadata && data.metadata.repository ? data.metadata.repository : "";
+    const isZh = /[\u4e00-\u9fff]/.test(pages.map((page) => page.title || "").join(""));
+    const t = isZh
+      ? { pages: "页面", related: "相关页面", files: "相关文件", empty: "从左侧选择一个页面", search: "搜索页面..." }
+      : { pages: "Pages", related: "Related pages", files: "Related files", empty: "Select a page from the navigation", search: "Search pages..." };
+
+    document.title = (repoLabel.split(/[\\\\/]/).pop() || "DeepWiki") + " Wiki";
+    document.getElementById("repo-label").textContent = repoLabel;
+    document.getElementById("pages-label").textContent = t.pages;
+    document.getElementById("search").placeholder = t.search;
+
+    function getMermaid() {
+      if (typeof mermaid !== "undefined") return mermaid;
+      const bundled = window.__esbuild_esm_mermaid_nm && window.__esbuild_esm_mermaid_nm.mermaid;
+      if (!bundled) return null;
+      return bundled.default || bundled;
+    }
+
+    const mermaidApi = getMermaid();
+    if (mermaidApi && typeof mermaidApi.initialize === "function") {
+      mermaidApi.initialize({
+        startOnLoad: false,
+        theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
+        securityLevel: "loose",
+        suppressErrorRendering: true,
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function preprocessMermaid(chart) {
+      let processed = String(chart || "").replace(/\r\n/g, "\n").trim();
+      processed = processed.replace(/^```(?:mermaid)?\s*/i, "").replace(/\s*```$/i, "");
+      processed = processed.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
+      const isFlow = /^(graph|flowchart)\b/m.test(processed) || /\b[A-Za-z][\w-]*\[[^\]]+\]/.test(processed);
+      if (!isFlow) return processed;
+      if (!/^(graph|flowchart)\b/m.test(processed)) processed = "graph TD\n" + processed;
+      processed = processed.replace(/-->>/g, "-->").replace(/->>/g, "-->");
+      processed = processed.replace(/(\b[A-Za-z][\w-]*)\[([^\]\n]+)\]/g, (match, nodeId, rawLabel) => {
+        const label = rawLabel.trim();
+        if ((label.startsWith('"') && label.endsWith('"')) || (label.startsWith("'") && label.endsWith("'"))) return match;
+        if (!/[/<>(){}|&*#@!?=+,;:'"\\]/.test(label)) return match;
+        return nodeId + '["' + label.replace(/"/g, "#quot;") + '"]';
+      });
+      processed = processed.replace(/-->\|([^|]+)\|/g, (match, rawLabel) => {
+        const label = rawLabel.trim();
+        if ((label.startsWith('"') && label.endsWith('"')) || (label.startsWith("'") && label.endsWith("'"))) return match;
+        if (!/[/<>(){}|&*#@!?=+,;:'"\\ ]/.test(label)) return match;
+        return '-->|"' + label.replace(/"/g, "#quot;") + '"|';
+      });
+      return processed;
+    }
+
+    function renderInline(text) {
+      return escapeHtml(text)
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    }
+
+    function renderMarkdownLite(src) {
+      const lines = String(src || "").replace(/\r\n/g, "\n").split("\n");
+      const out = [];
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+        if (!line.trim()) { i += 1; continue; }
+        if (/^```/.test(line)) {
+          const lang = escapeHtml(line.slice(3).trim());
+          const buf = [];
+          i += 1;
+          while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i += 1; }
+          i += 1;
+          out.push(`<pre><code class="language-${lang}">${escapeHtml(buf.join("\n"))}</code></pre>`);
+          continue;
+        }
+        if (/^\|/.test(line) && i + 1 < lines.length && /^\|?\s*:?-{3,}/.test(lines[i + 1])) {
+          const rows = [];
+          while (i < lines.length && /^\|/.test(lines[i])) { rows.push(lines[i]); i += 1; }
+          const parseRow = (row) => row.replace(/^\||\|$/g, "").split("|").map((cell) => renderInline(cell.trim()));
+          const head = parseRow(rows[0]);
+          const body = rows.slice(2).map(parseRow);
+          out.push("<table><thead><tr>" + head.map((cell) => `<th>${cell}</th>`).join("") + "</tr></thead><tbody>" + body.map((row) => "<tr>" + row.map((cell) => `<td>${cell}</td>`).join("") + "</tr>").join("") + "</tbody></table>");
+          continue;
+        }
+        const heading = line.match(/^(#{1,6})\s+(.*)$/);
+        if (heading) {
+          const level = heading[1].length;
+          out.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
+          i += 1;
+          continue;
+        }
+        if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) { out.push("<hr>"); i += 1; continue; }
+        if (/^>\s?/.test(line)) {
+          const buf = [];
+          while (i < lines.length && /^>\s?/.test(lines[i])) { buf.push(lines[i].replace(/^>\s?/, "")); i += 1; }
+          out.push(`<blockquote>${renderMarkdownLite(buf.join("\n"))}</blockquote>`);
+          continue;
+        }
+        if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {
+          const ordered = /^\s*\d+\./.test(line);
+          const items = [];
+          while (i < lines.length && /^\s*([-*+]|\d+\.)\s+/.test(lines[i])) {
+            items.push(`<li>${renderInline(lines[i].replace(/^\s*([-*+]|\d+\.)\s+/, ""))}</li>`);
+            i += 1;
+          }
+          out.push(`${ordered ? "<ol>" : "<ul>"}${items.join("")}${ordered ? "</ol>" : "</ul>"}`);
+          continue;
+        }
+        if (/^<\/?[a-z][\s\S]*>/i.test(line.trim())) {
+          const buf = [line];
+          i += 1;
+          while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s+|```|\|)/.test(lines[i])) {
+            buf.push(lines[i]);
+            i += 1;
+          }
+          out.push(buf.join("\n"));
+          continue;
+        }
+        const buf = [line];
+        i += 1;
+        while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s+|```|\||>\s|[-*+]\s|\d+\.\s)/.test(lines[i])) {
+          buf.push(lines[i]);
+          i += 1;
+        }
+        out.push(`<p>${renderInline(buf.join(" "))}</p>`);
+      }
+      return out.join("\n");
+    }
+
+    function parseMarkdown(text) {
+      if (typeof marked !== "undefined") {
+        return marked.parse(text, { gfm: true, breaks: false });
+      }
+      return renderMarkdownLite(text);
+    }
+
+    function renderMarkdown(markdown) {
+      const diagrams = [];
+      const withPlaceholders = String(markdown || "").replace(/```[ \t]*mermaid[ \t]*\r?\n([\s\S]*?)```/g, (_, src) => {
+        diagrams.push(src.trim());
+        return "\n\n[[[WIKIMERMAID" + (diagrams.length - 1) + "]]]\n\n";
+      });
+      let html = parseMarkdown(withPlaceholders);
+      html = html.replace(/\[\[\[WIKIMERMAID(\d+)\]\]\]/g, (_, index) => {
+        return '<div class="mermaid-mount" data-index="' + index + '"></div>';
+      });
+      return { html, diagrams };
+    }
+
+    function currentId() {
+      const hash = decodeURIComponent(location.hash.replace(/^#/, ""));
+      if (hash && byId[hash]) return hash;
+      return pages[0] ? pages[0].id : "";
+    }
+
+    function renderNav(filter) {
+      const nav = document.getElementById("nav");
+      const q = (filter || "").trim().toLowerCase();
+      nav.innerHTML = pages
+        .filter((page) => !q || (page.title || "").toLowerCase().includes(q) || (page.content || "").toLowerCase().includes(q))
+        .map((page) => {
+          const active = page.id === currentId() ? " active" : "";
+          return `<button class="page-btn${active}" data-id="${page.id}">${escapeHtml(page.title)}<span class="importance">${page.importance || ""}</span></button>`;
+        })
+        .join("");
+    }
+
+    async function renderPage() {
+      const page = byId[currentId()];
+      const article = document.getElementById("article");
+      if (!page) {
+        article.innerHTML = `<div class="empty">${t.empty}</div>`;
+        return;
+      }
+      const related = (page.relatedPages || [])
+        .map((id) => byId[id])
+        .filter(Boolean)
+        .map((item) => `<button class="chip" data-id="${item.id}">${escapeHtml(item.title)}</button>`)
+        .join("");
+      const files = (page.filePaths || [])
+        .map((file) => `<span class="chip file-chip">${escapeHtml(file)}</span>`)
+        .join("");
+      const rendered = renderMarkdown(page.content);
+      article.innerHTML = `
+        <div class="prose">${rendered.html}</div>
+        ${related ? `<div class="meta-block"><div class="nav-title">${t.related}</div>${related}</div>` : ""}
+        ${files ? `<div class="meta-block"><div class="nav-title">${t.files}</div>${files}</div>` : ""}
+      `;
+      renderNav(document.getElementById("search").value);
+      if (mermaidApi && typeof mermaidApi.render === "function") {
+        const mounts = article.querySelectorAll(".mermaid-mount");
+        for (const mount of mounts) {
+          const index = Number(mount.getAttribute("data-index"));
+          const source = preprocessMermaid(rendered.diagrams[index] || "");
+          const id = "wikimmd" + index + "x" + Math.random().toString(36).slice(2);
+          try {
+            const result = await mermaidApi.render(id, source);
+            mount.innerHTML = result.svg;
+            if (typeof result.bindFunctions === "function") result.bindFunctions(mount);
+          } catch (error) {
+            console.warn("Mermaid render failed", error);
+            mount.innerHTML = '<pre class="mermaid-fallback">' + escapeHtml(source) + "</pre>";
+          }
+        }
+      }
+    }
+
+    document.getElementById("nav").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-id]");
+      if (!button) return;
+      location.hash = button.getAttribute("data-id");
+    });
+    document.getElementById("article").addEventListener("click", (event) => {
+      const button = event.target.closest("button.chip[data-id]");
+      if (!button) return;
+      location.hash = button.getAttribute("data-id");
+    });
+    document.getElementById("search").addEventListener("input", (event) => renderNav(event.target.value));
+    document.getElementById("menu-btn").addEventListener("click", () => {
+      document.getElementById("sidebar").classList.toggle("open");
+    });
+    window.addEventListener("hashchange", renderPage);
+    if (!location.hash && pages[0]) location.hash = pages[0].id;
+    else renderPage();
+  </script>
+</body>
+</html>

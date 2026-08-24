@@ -254,8 +254,10 @@ IMPORTANT: All prose MUST be written in {language_name} language.
 You are given a codemap JSON skeleton (in <SKELETON>) and the original source context.
 For EACH section, write:
 - "guide": a concise prose explanation (2-4 sentences) of what the section accomplishes.
-- "diagram": a valid Mermaid diagram source string (e.g. a "graph LR" or "flowchart TD") that
+- "diagram": a valid Mermaid diagram source string (e.g. a "flowchart TD" or "graph TD") that
   illustrates the flow of that section. Use only Mermaid syntax; do NOT wrap it in ```mermaid fences.
+  Flowchart arrows must be -->, ---, -.->, or ==> — NEVER sequence-diagram arrows (->> or -->>).
+  Quote node labels that contain /, (), or punctuation: E["文件读写/图片资源"].
 Keep every other field (title, summary, steps, citations, ids) EXACTLY as given. Do not add or remove steps.
 </task>
 

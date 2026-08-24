@@ -109,6 +109,7 @@
     "embeddingErrorDefault": "這是 Embedding 介面失敗，不是儲存庫地址格式問題。產生 Wiki 需要閘道提供 POST /embeddings。請檢查 Embedding 模型名稱、API 金鑰，並確認目前介面確實支援向量嵌入。",
     "backToHome": "返回首頁",
     "exportWiki": "匯出 Wiki",
+    "exportAsHtml": "匯出為本機網頁",
     "exportAsMarkdown": "匯出為 Markdown",
     "exportAsJson": "匯出為 JSON",
     "pages": "頁面",

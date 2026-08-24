@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
+import { preprocessMermaidChart } from '@/utils/mermaid';
 // We'll use dynamic import for svg-pan-zoom
 
 // Initialize mermaid with defaults - Japanese aesthetic
@@ -365,8 +366,8 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
         setError(null);
         setSvg('');
 
-        // Render the chart directly without preprocessing
-        const { svg: renderedSvg } = await mermaid.render(idRef.current, chart);
+        const processedChart = preprocessMermaidChart(chart);
+        const { svg: renderedSvg } = await mermaid.render(idRef.current, processedChart);
 
         if (!isMounted) return;
 
@@ -392,7 +393,7 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
           if (mermaidRef.current) {
             mermaidRef.current.innerHTML = `
               <div class="text-red-500 dark:text-red-400 text-xs mb-1">Syntax error in diagram</div>
-              <pre class="text-xs overflow-auto p-2 bg-gray-100 dark:bg-gray-800 rounded">${chart}</pre>
+              <pre class="text-xs overflow-auto p-2 bg-gray-100 dark:bg-gray-800 rounded">${preprocessMermaidChart(chart)}</pre>
             `;
           }
         }

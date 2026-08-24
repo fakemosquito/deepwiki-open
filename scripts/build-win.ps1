@@ -162,6 +162,16 @@ import site
   Write-Host "==> Copying API sources"
   Copy-Tree (Join-Path $root "api") $apiDir @("__pycache__", "logs", ".venv")
 
+  $wikiVendor = Join-Path $apiDir "services\wiki\vendor"
+  New-Item -ItemType Directory -Force -Path $wikiVendor | Out-Null
+  $mermaidJs = Join-Path $root "node_modules\mermaid\dist\mermaid.min.js"
+  $markedJs = Join-Path $root "node_modules\marked\lib\marked.umd.js"
+  if (-not (Test-Path $mermaidJs)) { throw "Missing $mermaidJs (needed for offline wiki HTML export)" }
+  Copy-Item $mermaidJs (Join-Path $wikiVendor "mermaid.min.js") -Force
+  if (Test-Path $markedJs) {
+    Copy-Item $markedJs (Join-Path $wikiVendor "marked.umd.js") -Force
+  }
+
   Write-Host "==> Copying Next.js standalone server"
   if (Test-Path $webDir) { Remove-Item $webDir -Recurse -Force }
   New-Item -ItemType Directory -Force -Path $webDir | Out-Null

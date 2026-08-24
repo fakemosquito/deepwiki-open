@@ -111,6 +111,7 @@
     "embeddingErrorDefault": "这是本机 Embedding 模型失败，不是仓库地址格式问题。Wiki 索引直接在本机运行 BAAI/bge-small-en-v1.5，不需要网关提供 POST /embeddings。请确认已安装 fastembed，并检查首次下载模型是否成功。",
     "backToHome": "返回首页",
     "exportWiki": "导出Wiki",
+    "exportAsHtml": "导出为本地网页",
     "exportAsMarkdown": "导出为Markdown",
     "exportAsJson": "导出为JSON",
     "pages": "页面",

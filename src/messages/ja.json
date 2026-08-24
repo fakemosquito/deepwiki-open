@@ -111,6 +111,7 @@
     "embeddingErrorDefault": "これは Embedding API の失敗であり、リポジトリ URL の問題ではありません。Wiki 生成には POST /embeddings が必要です。埋め込みモデル名と、プロバイダーが embeddings エンドポイントを提供しているかを確認してください。",
     "backToHome": "ホームに戻る",
     "exportWiki": "Wikiをエクスポート",
+    "exportAsHtml": "ローカルWebページとしてエクスポート",
     "exportAsMarkdown": "Markdownとしてエクスポート",
     "exportAsJson": "JSONとしてエクスポート",
     "pages": "ページ",

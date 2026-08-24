@@ -38,7 +38,7 @@ router = APIRouter(tags=["wiki"])
 @router.post("/export/wiki")
 async def post_export_wiki(request: WikiExportRequest):
     """
-    Export wiki content as Markdown or JSON.
+    Export wiki content as Markdown, JSON, or a standalone HTML page.
 
     Args:
         request: The export request containing wiki pages and format
@@ -48,9 +48,9 @@ async def post_export_wiki(request: WikiExportRequest):
     """
     logger.info(f"Exporting wiki for {request.repo_url} in {request.format} format")
 
-    # Extract repository name from URL for the filename
-    repo_parts = request.repo_url.rstrip("/").split("/")
-    repo_name = repo_parts[-1] if len(repo_parts) > 0 else "wiki"
+    repo_name = request.repo_url.replace("\\", "/").rstrip("/").split("/")[-1] or "wiki"
+    for ch in '<>:"|?*':
+        repo_name = repo_name.replace(ch, "_")
 
     timestamp = datetime.now()
 
@@ -63,11 +63,12 @@ async def post_export_wiki(request: WikiExportRequest):
     filename = f"{repo_name}_wiki_{timestamp.strftime('%Y%m%d_%H%M%S')}"
 
     if request.format == "markdown":
-        # Generate Markdown content
         filename += ".md"
         media_type = "text/markdown"
-    else:  # JSON format
-        # Generate JSON content
+    elif request.format == "html":
+        filename += ".html"
+        media_type = "text/html; charset=utf-8"
+    else:
         filename += ".json"
         media_type = "application/json"
 

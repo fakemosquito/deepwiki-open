@@ -111,6 +111,7 @@
     "embeddingErrorDefault": "Đây là lỗi Embedding API, không phải lỗi địa chỉ repository. Tạo wiki cần POST /embeddings. Hãy kiểm tra tên mô hình embedding và nhà cung cấp có hỗ trợ endpoint này hay không.",
     "backToHome": "Quay lại trang chủ",
     "exportWiki": "Xuất Wiki",
+    "exportAsHtml": "Xuất thành trang web cục bộ",
     "exportAsMarkdown": "Xuất dưới dạng Markdown",
     "exportAsJson": "Xuất dưới dạng JSON",
     "pages": "Trang",

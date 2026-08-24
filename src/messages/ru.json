@@ -120,6 +120,7 @@
     "embeddingErrorDefault": "Это сбой Embedding API, а не проблема с адресом репозитория. Для генерации wiki нужен POST /embeddings. Проверьте имя модели эмбеддингов и что провайдер предоставляет этот endpoint.",
     "backToHome": "Назад на главную",
     "exportWiki": "Экспортировать Wiki",
+    "exportAsHtml": "Экспорт в локальную веб-страницу",
     "exportAsMarkdown": "Экспорт в Markdown",
     "exportAsJson": "Экспорт в JSON",
     "pages": "Страницы",

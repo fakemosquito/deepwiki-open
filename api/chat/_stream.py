@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from collections.abc import AsyncIterator, Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 from adalflow.core.types import ModelType
 
@@ -24,6 +24,45 @@ if TYPE_CHECKING:
 MODEL_CFG = dict[str, str | int | float]
 
 logger = get_logger("chat")
+
+
+def extract_openai_compat_text(chunk: Any) -> str | None:
+    """Return the next text fragment from a Chat Completions or Responses event.
+
+    Newer OpenAI SDKs stream `ResponseCreatedEvent` objects that have no
+    `choices` attribute. Accessing it raises AttributeError and aborts the wiki
+    generation before any model text is read.
+    """
+    if chunk is None:
+        return None
+    if isinstance(chunk, str):
+        return chunk or None
+
+    choices = _attr(chunk, "choices")
+    if isinstance(choices, Sequence) and choices:
+        first = choices[0]
+        delta = _attr(first, "delta")
+        content = _attr(delta, "content") if delta is not None else None
+        if content:
+            return content
+        message = _attr(first, "message")
+        content = _attr(message, "content") if message is not None else None
+        if content:
+            return content
+
+    if _attr(chunk, "type") == "response.output_text.delta":
+        delta = _attr(chunk, "delta")
+        if isinstance(delta, str) and delta:
+            return delta
+    return None
+
+
+def _attr(obj: Any, name: str) -> Any:
+    if obj is None:
+        return None
+    if isinstance(obj, Mapping):
+        return obj.get(name)
+    return getattr(obj, name, None)
 
 
 class ChatStreamer(ABC):
@@ -165,12 +204,9 @@ class _OpenAICompatStreamer(ChatStreamer):
         )
 
         async for chunk in response:
-            if (
-                chunk.choices
-                and chunk.choices[0].delta is not None
-                and chunk.choices[0].delta.content is not None
-            ):
-                yield chunk.choices[0].delta.content
+            text = extract_openai_compat_text(chunk)
+            if text:
+                yield text
 
 
 class OpenAIChatStreamer(_OpenAICompatStreamer):

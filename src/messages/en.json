@@ -120,6 +120,7 @@
     "embeddingErrorDefault": "This is a local embedding failure, not a repository URL problem. Wiki indexing runs BAAI/bge-small-en-v1.5 in-process and does not need POST /embeddings on the chat gateway. Install fastembed and check that the model downloaded successfully.",
     "backToHome": "Back to Home",
     "exportWiki": "Export Wiki",
+    "exportAsHtml": "Export as local webpage",
     "exportAsMarkdown": "Export as Markdown",
     "exportAsJson": "Export as JSON",
     "pages": "Pages",

@@ -14,6 +14,7 @@ from api.schemas import (
     aload,
     asave,
 )
+from api.services.wiki.html_export import generate_html_export
 from api.utils import deepwiki_root
 
 logger = get_logger(__name__)
@@ -234,7 +235,7 @@ def _generate_markdown_export(
 def export_wiki(
     repo_url: str,
     pages: list[WikiPage],
-    format: Literal["json", "markdown"],
+    format: Literal["json", "markdown", "html"],
     timestamp: datetime | None = None,
 ) -> str:
     dt = timestamp or datetime.now()
@@ -242,7 +243,9 @@ def export_wiki(
         return _generate_json_export(repo_url, pages, timestamp=dt)
     elif format == "markdown":
         return _generate_markdown_export(repo_url, pages, timestamp=dt)
+    elif format == "html":
+        return generate_html_export(repo_url, pages, timestamp=dt)
     else:
         raise NotImplementedError(
-            f"Exporting wiki to format {format} is not supported. Must be one of 'markdown' or 'json'.",
+            f"Exporting wiki to format {format} is not supported. Must be one of 'markdown', 'json', or 'html'.",
         )

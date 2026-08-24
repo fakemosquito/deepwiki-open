@@ -19,7 +19,7 @@ import {
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FaBitbucket, FaBookOpen, FaComments, FaDownload, FaExclamationTriangle, FaFileExport, FaFolder, FaGithub, FaGitlab, FaHome, FaSync, FaTimes } from 'react-icons/fa';
+import { FaBitbucket, FaBookOpen, FaComments, FaDownload, FaExclamationTriangle, FaFileExport, FaFolder, FaGithub, FaGitlab, FaGlobe, FaHome, FaSync, FaTimes } from 'react-icons/fa';
 // Define the WikiSection and WikiStructure types directly in this file
 // since the imported types don't have the sections and rootSections properties
 interface WikiSection {
@@ -613,7 +613,7 @@ export default function RepoWikiPage() {
   }, []);
 
   // Function to export wiki content
-  const exportWiki = useCallback(async (format: 'markdown' | 'json') => {
+  const exportWiki = useCallback(async (format: 'markdown' | 'json' | 'html') => {
     if (!wikiStructure || Object.keys(generatedPages).length === 0) {
       setExportError('No wiki content to export');
       return;
@@ -658,7 +658,8 @@ export default function RepoWikiPage() {
 
       // Get the filename from the Content-Disposition header if available
       const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `${effectiveRepoInfo.repo}_wiki.${format === 'markdown' ? 'md' : 'json'}`;
+      const extension = format === 'markdown' ? 'md' : format === 'html' ? 'html' : 'json';
+      let filename = `${effectiveRepoInfo.repo}_wiki.${extension}`;
 
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename=(.+)/);
@@ -1055,9 +1056,17 @@ export default function RepoWikiPage() {
                   </h4>
                   <div className="flex flex-col gap-2">
                     <button
-                      onClick={() => exportWiki('markdown')}
+                      onClick={() => exportWiki('html')}
                       disabled={isExporting}
                       className="btn-japanese flex items-center text-xs px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FaGlobe className="mr-2" />
+                      {messages.repoPage?.exportAsHtml || 'Export as local webpage'}
+                    </button>
+                    <button
+                      onClick={() => exportWiki('markdown')}
+                      disabled={isExporting}
+                      className="flex items-center text-xs px-3 py-2 bg-[var(--background)] text-[var(--foreground)] rounded-md hover:bg-[var(--background)]/80 disabled:opacity-50 disabled:cursor-not-allowed border border-[var(--border-color)] transition-colors"
                     >
                       <FaDownload className="mr-2" />
                       {messages.repoPage?.exportAsMarkdown || 'Export as Markdown'}

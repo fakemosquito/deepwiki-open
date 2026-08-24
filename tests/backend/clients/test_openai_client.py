@@ -1,3 +1,7 @@
+from types import SimpleNamespace
+
+from adalflow.core.types import ModelType
+
 from api.clients import LiteLLMClient, OpenAIClient
 from api.config import configs, get_embedder
 
@@ -54,3 +58,40 @@ def test_litellm_client_constructs_with_legacy_kwargs(monkeypatch):
         base_url="http://localhost:4000",
     )
     assert client.base_url.rstrip("/").endswith("/v1")
+
+
+def test_llm_kwargs_use_chat_completions_messages(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    client = OpenAIClient(api_key="sk-test", base_url="https://proxy.example/v1")
+    kwargs = client.convert_inputs_to_api_kwargs(
+        input="hello wiki",
+        model_kwargs={"model": "glm-5.2", "stream": True, "temperature": 0.7},
+        model_type=ModelType.LLM,
+    )
+    assert kwargs["messages"] == [{"role": "user", "content": "hello wiki"}]
+    assert "input" not in kwargs
+    assert kwargs["model"] == "glm-5.2"
+    assert kwargs["stream"] is True
+
+
+def test_llm_call_uses_chat_completions_not_responses(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    client = OpenAIClient(api_key="sk-test", base_url="https://proxy.example/v1")
+    captured = {}
+
+    def fake_create(**kwargs):
+        captured["kwargs"] = kwargs
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))])
+
+    monkeypatch.setattr(client.sync_client.chat.completions, "create", fake_create)
+
+    def fail_responses(**kwargs):
+        raise AssertionError("LLM calls must not use the Responses API")
+
+    monkeypatch.setattr(client.sync_client.responses, "create", fail_responses)
+
+    client.call(
+        api_kwargs={"model": "glm-5.2", "messages": [{"role": "user", "content": "hi"}]},
+        model_type=ModelType.LLM,
+    )
+    assert captured["kwargs"]["messages"][0]["content"] == "hi"
