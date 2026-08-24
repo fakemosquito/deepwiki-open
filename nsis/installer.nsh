@@ -1,5 +1,5 @@
 !macro customInstall
-  DetailPrint "DeepWiki runs the wiki frontend and API locally. Docker is not required."
+  DetailPrint "DeepWiki bundles Python 3.11, Node, and Git. The system Python is not used."
 !macroend
 
 !macro customUnInstall

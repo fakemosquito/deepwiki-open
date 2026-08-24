@@ -25,6 +25,10 @@ $mingitVersion = "2.47.1"
 $pythonUrl = "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-embed-amd64.zip"
 $getPipUrl = "https://bootstrap.pypa.io/get-pip.py"
 $mingitUrl = "https://github.com/git-for-windows/git/releases/download/v$mingitVersion.windows.1/MinGit-$mingitVersion-64-bit.zip"
+$nodeVersion = ((& node -v) 2>$null)
+if (-not $nodeVersion) { throw "node is required on the build machine" }
+$nodeVersion = $nodeVersion.ToString().Trim().TrimStart("v")
+$nodeUrl = "https://nodejs.org/dist/v$nodeVersion/win-x64/node.exe"
 
 $cacheDir = Join-Path $root "electron\.cache"
 $resources = Join-Path $root "electron\resources"
@@ -47,6 +51,28 @@ function Invoke-Download($url, $dest) {
   if (Test-Path $dest) { return }
   & curl.exe -L --fail --retry 3 --retry-all-errors -o $dest $url
   if ($LASTEXITCODE -ne 0) { throw "Download failed: $url" }
+}
+
+function Copy-VcRuntime($destDir) {
+  New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+  $names = @(
+    "vcruntime140.dll",
+    "vcruntime140_1.dll",
+    "msvcp140.dll",
+    "msvcp140_1.dll",
+    "msvcp140_2.dll",
+    "msvcp140_atomic_wait.dll",
+    "msvcp140_codecvt_ids.dll",
+    "concrt140.dll",
+    "vcomp140.dll"
+  )
+  $sys = Join-Path $env:WINDIR "System32"
+  foreach ($name in $names) {
+    $src = Join-Path $sys $name
+    if (Test-Path $src) {
+      Copy-Item $src (Join-Path $destDir $name) -Force
+    }
+  }
 }
 
 function Expand-Zip($zip, $dest) {
@@ -138,7 +164,12 @@ import site
   if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed" }
   & $pythonExe -m pip install --prefer-binary --no-warn-script-location -r (Join-Path $PSScriptRoot "desktop-requirements.txt")
   if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
-  & $pythonExe -c "import fastapi, uvicorn, adalflow, faiss, tiktoken, git, numpy"
+  Copy-Item $pythonExe (Join-Path $pythonDir "python3.exe") -Force
+  Copy-VcRuntime $pythonDir
+
+  & $pythonExe -c "import sys; assert sys.version_info[:2] >= (3, 11), sys.version"
+  if ($LASTEXITCODE -ne 0) { throw "Bundled Python is not 3.11+" }
+  & $pythonExe -c "import fastapi, uvicorn, adalflow, faiss, tiktoken, git, numpy, onnxruntime, fastembed"
   if ($LASTEXITCODE -ne 0) { throw "Python runtime import check failed" }
 
   New-Item -ItemType Directory -Force -Path $tiktokenDir | Out-Null
@@ -146,10 +177,23 @@ import site
   & $pythonExe -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
   if ($LASTEXITCODE -ne 0) { throw "tiktoken cache warmup failed" }
 
-  Write-Host "==> Bundling portable Node"
+  Write-Host "==> Bundling portable Node $nodeVersion"
   New-Item -ItemType Directory -Force -Path $nodeDir | Out-Null
-  $nodeSrc = (Get-Command node).Source
-  Copy-Item $nodeSrc (Join-Path $nodeDir "node.exe") -Force
+  $nodeExe = Join-Path $nodeDir "node.exe"
+  $needNode = $ForceRuntime -or -not (Test-Path $nodeExe)
+  $nodeCache = Join-Path $cacheDir "node-$nodeVersion-win-x64.exe"
+  try {
+    Invoke-Download $nodeUrl $nodeCache
+  } catch {
+    Write-Host "Official Node download failed, copying local node.exe"
+    Copy-Item (Get-Command node).Source $nodeCache -Force
+  }
+  if ($needNode -or $ForceRuntime) {
+    Copy-Item $nodeCache $nodeExe -Force
+  }
+  Copy-VcRuntime $nodeDir
+  & $nodeExe -v
+  if ($LASTEXITCODE -ne 0) { throw "Bundled node.exe failed to start" }
 
   $needGit = $ForceRuntime -or -not (Test-Path (Join-Path $gitDir "cmd\git.exe"))
   if ($needGit) {

@@ -35,6 +35,9 @@ wheels/
 *.venv
 # testing
 /coverage
+.pytest_cache/
+.tmp-pytest/
+.tmp-*.ps1
 
 # next.js
 /.next/

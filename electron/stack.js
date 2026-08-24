@@ -56,6 +56,9 @@ function isUsablePython(filePath) {
 function pythonExe() {
   const bundled = getPythonExe();
   if (exists(bundled)) return bundled;
+  // Packaged builds must use the bundled CPython. Falling back to PATH would
+  // pick up Python 2.7 on older Windows machines.
+  if (app.isPackaged) return null;
   for (const name of ['python3', 'python']) {
     const found = resolveOnPath(name);
     if (isUsablePython(found)) return found;
@@ -66,6 +69,7 @@ function pythonExe() {
 function nodeExe() {
   const bundled = getNodeExe();
   if (exists(bundled)) return bundled;
+  if (app.isPackaged) return null;
   return resolveOnPath('node');
 }
 
@@ -126,14 +130,31 @@ function killTree(child) {
   }
 }
 
+function pushBinDir(pathParts, filePath) {
+  if (filePath && filePath.includes(path.sep)) {
+    pathParts.push(path.dirname(filePath));
+  }
+}
+
 function runtimeEnv(paths) {
   const settings = readSettings();
+  const python = pythonExe();
+  const node = nodeExe();
   const git = gitExe();
   const pathParts = [];
+  pushBinDir(pathParts, python);
+  if (python) {
+    const scripts = path.join(path.dirname(python), 'Scripts');
+    if (exists(scripts)) pathParts.push(scripts);
+  }
+  pushBinDir(pathParts, node);
+  pushBinDir(pathParts, git);
   if (git && git.includes(path.sep)) {
-    pathParts.push(path.dirname(git));
-    const mingw = path.join(path.dirname(path.dirname(git)), 'mingw64', 'bin');
+    const gitRoot = path.dirname(path.dirname(git));
+    const mingw = path.join(gitRoot, 'mingw64', 'bin');
     if (exists(mingw)) pathParts.push(mingw);
+    const usrBin = path.join(gitRoot, 'usr', 'bin');
+    if (exists(usrBin)) pathParts.push(usrBin);
   }
   pathParts.push(process.env.PATH || '');
 
@@ -156,9 +177,17 @@ function runtimeEnv(paths) {
     PYTHONUTF8: '1',
     PYTHONIOENCODING: 'utf-8',
     PYTHONUNBUFFERED: '1',
+    PYTHONNOUSERSITE: '1',
+    PY_PYTHON: '3.11',
     PYTHONPATH: app.isPackaged ? getRuntimeRoot() : getAppRoot(),
     PATH: pathParts.join(path.delimiter),
   };
+  delete env.PYTHONHOME;
+  delete env.PYTHONSTARTUP;
+  delete env.VIRTUAL_ENV;
+  delete env.CONDA_PREFIX;
+  delete env.CONDA_DEFAULT_ENV;
+  delete env.CONDA_PYTHON_EXE;
   if (git && git.includes(path.sep)) {
     env.GIT_PYTHON_GIT_EXECUTABLE = git;
   }
