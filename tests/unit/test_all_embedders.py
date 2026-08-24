@@ -100,6 +100,7 @@ class TestEmbedderConfiguration:
         assert "embedder" in configs, "OpenAI embedder config missing"
         assert "embedder_google" in configs, "Google embedder config missing"
         assert "embedder_ollama" in configs, "Ollama embedder config missing"
+        assert "embedder_local" in configs, "Local embedder config missing"
         assert "embedder_bedrock" in configs, "Bedrock embedder config missing"
 
         # Check client classes are available
@@ -112,6 +113,9 @@ class TestEmbedderConfiguration:
         assert (
             "OllamaClient" in CLIENT_CLASSES
         ), "OllamaClient missing from CLIENT_CLASSES"
+        assert (
+            "LocalEmbedderClient" in CLIENT_CLASSES
+        ), "LocalEmbedderClient missing from CLIENT_CLASSES"
         assert (
             "BedrockClient" in CLIENT_CLASSES
         ), "BedrockClient missing from CLIENT_CLASSES"
@@ -132,6 +136,7 @@ class TestEmbedderConfiguration:
             "google",
             "ollama",
             "bedrock",
+            "local",
         ], f"Invalid embedder type: {current_type}"
 
         # Boolean functions should work
@@ -149,6 +154,8 @@ class TestEmbedderConfiguration:
             assert is_ollama and not is_google and not is_bedrock
         elif current_type == "google":
             assert is_google and not is_ollama and not is_bedrock
+        elif current_type == "local":
+            assert not is_ollama and not is_google and not is_bedrock
         else:  # openai
             assert not is_ollama and not is_google and not is_bedrock
 
@@ -206,6 +213,9 @@ class TestEmbedderFactory:
             logger.warning(
                 f"Ollama embedder creation failed (expected if Ollama not available): {e}"
             )
+
+        local_embedder = get_embedder(embedder_type="local")
+        assert local_embedder is not None, "Local embedder should be created"
 
     def test_get_embedder_with_legacy_params(self):
         """Test get_embedder with legacy boolean parameters."""
@@ -387,7 +397,7 @@ class TestEnvironmentVariableHandling:
             self._test_single_embedder_type(embedder_type)
         else:
             # Test all embedder types
-            for et in ["openai", "google", "ollama", "bedrock"]:
+            for et in ["openai", "google", "ollama", "bedrock", "local"]:
                 self._test_single_embedder_type(et)
 
     def _test_single_embedder_type(self, embedder_type):

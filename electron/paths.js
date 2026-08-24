@@ -103,6 +103,23 @@ function parseEnvFile(contents) {
   return out;
 }
 
+const DEFAULT_LOCAL_EMBEDDING_MODEL = 'BAAI/bge-small-en-v1.5';
+
+function resolveLocalEmbeddingModel(name) {
+  const value = String(name || '').trim();
+  if (!value) return DEFAULT_LOCAL_EMBEDDING_MODEL;
+  const lower = value.toLowerCase();
+  if (
+    lower.startsWith('text-embedding') ||
+    lower.includes('gemini-embedding') ||
+    lower.includes('titan-embed') ||
+    lower === 'nomic-embed-text'
+  ) {
+    return DEFAULT_LOCAL_EMBEDDING_MODEL;
+  }
+  return value;
+}
+
 function normalizeBaseUrl(url) {
   let value = String(url || '').trim();
   if (!value) return '';
@@ -122,8 +139,8 @@ function defaultEnvContents(values) {
 OPENAI_BASE_URL=${baseUrl}
 OPENAI_API_KEY=${v.OPENAI_API_KEY || ''}
 OPENAI_MODEL=${v.OPENAI_MODEL || ''}
-OPENAI_EMBEDDING_MODEL=${v.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small'}
-DEEPWIKI_EMBEDDER_TYPE=openai
+OPENAI_EMBEDDING_MODEL=${resolveLocalEmbeddingModel(v.OPENAI_EMBEDDING_MODEL)}
+DEEPWIKI_EMBEDDER_TYPE=local
 GOOGLE_API_KEY=${v.GOOGLE_API_KEY || ''}
 OPENROUTER_API_KEY=${v.OPENROUTER_API_KEY || ''}
 AZURE_OPENAI_API_KEY=${v.AZURE_OPENAI_API_KEY || ''}
@@ -153,8 +170,7 @@ function writeDesktopModelConfig(keys) {
   }
 
   const model = String(keys.OPENAI_MODEL || '').trim() || 'gpt-4o';
-  const embeddingModel =
-    String(keys.OPENAI_EMBEDDING_MODEL || '').trim() || 'text-embedding-3-small';
+  const embeddingModel = resolveLocalEmbeddingModel(keys.OPENAI_EMBEDDING_MODEL);
 
   const generator = {
     default_provider: 'openai',
@@ -186,6 +202,13 @@ function writeDesktopModelConfig(keys) {
         base_url: '${OPENAI_BASE_URL}',
       },
       batch_size: 10,
+      model_kwargs: {
+        model: embeddingModel,
+      },
+    },
+    embedder_local: {
+      client_class: 'LocalEmbedderClient',
+      batch_size: 32,
       model_kwargs: {
         model: embeddingModel,
       },
@@ -237,6 +260,10 @@ function writeSettings(next) {
   if (mergedKeys.OPENAI_BASE_URL) {
     mergedKeys.OPENAI_BASE_URL = normalizeBaseUrl(mergedKeys.OPENAI_BASE_URL);
   }
+  mergedKeys.OPENAI_EMBEDDING_MODEL = resolveLocalEmbeddingModel(
+    mergedKeys.OPENAI_EMBEDDING_MODEL
+  );
+  mergedKeys.DEEPWIKI_EMBEDDER_TYPE = 'local';
   fs.writeFileSync(paths.envFile, defaultEnvContents(mergedKeys), 'utf8');
   writeDesktopModelConfig(mergedKeys);
   const settings = {
@@ -275,4 +302,6 @@ module.exports = {
   writeSettings,
   hasModelConnection,
   hasAnyApiKey: hasModelConnection,
+  DEFAULT_LOCAL_EMBEDDING_MODEL,
+  resolveLocalEmbeddingModel,
 };

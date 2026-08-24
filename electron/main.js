@@ -81,10 +81,15 @@ function createMainWindow() {
   });
 
   mainWindow.loadURL(`http://127.0.0.1:${FRONTEND_PORT}`);
-  mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
-    splashWindow?.close();
-  });
+  const reveal = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (!mainWindow.isVisible()) mainWindow.show();
+    if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
+  };
+  // Close the splash as soon as Chromium starts loading. Waiting for
+  // ready-to-show would keep it up through Next.js first compile.
+  mainWindow.webContents.once('did-start-loading', reveal);
+  mainWindow.once('ready-to-show', reveal);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);

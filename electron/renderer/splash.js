@@ -4,11 +4,11 @@ const I18N = {
     splashSubtitle: '桌面版会在本机启动 Wiki 前端与 API',
     setupTitle: '连接模型',
     setupHint:
-      '填写兼容 OpenAI 的 Base URL、密钥和对话模型。保存前会先测试连接，通过后再启动服务。',
+      '填写兼容 OpenAI 的 Base URL、密钥和对话模型。Wiki 索引会在本机直接运行 Embedding 模型（默认 BAAI/bge-small-en-v1.5），不需要 Ollama，也不需要网关提供 /embeddings。',
     baseUrl: 'Base URL',
     apiKey: 'API Key',
     model: 'Model',
-    embeddingModel: 'Embedding 模型（可选）',
+    embeddingModel: '本地 Embedding 模型',
     saveAndStart: '连接并启动',
     runtimeMissingTitle: '缺少运行组件',
     runtimeMissingBody:
@@ -21,6 +21,7 @@ const I18N = {
     connectTimeout: '连接超时，请检查 Base URL 或网络。',
     connectNetwork: '无法连接到该地址，请检查 Base URL。',
     connectFail: '连接失败',
+    connectEmbeddingFail: '本机 Embedding 模型加载失败',
     steps: {
       'check-runtime': '检查运行环境',
       'start-api': '启动 API 服务',
@@ -34,11 +35,11 @@ const I18N = {
     splashSubtitle: 'The desktop app starts the wiki UI and API on this machine',
     setupTitle: 'Connect a model',
     setupHint:
-      'Enter an OpenAI-compatible Base URL, API key, and chat model. The app tests the connection before starting.',
+      'Enter an OpenAI-compatible Base URL, API key, and chat model. Wiki indexing runs a local embedding model (default BAAI/bge-small-en-v1.5) in-process — no Ollama and no POST /embeddings on the chat gateway.',
     baseUrl: 'Base URL',
     apiKey: 'API Key',
     model: 'Model',
-    embeddingModel: 'Embedding model (optional)',
+    embeddingModel: 'Local embedding model',
     saveAndStart: 'Connect and start',
     runtimeMissingTitle: 'Runtime not found',
     runtimeMissingBody:
@@ -51,6 +52,7 @@ const I18N = {
     connectTimeout: 'Connection timed out. Check the Base URL or your network.',
     connectNetwork: 'Could not reach that address. Check the Base URL.',
     connectFail: 'Connection failed',
+    connectEmbeddingFail: 'The local embedding model failed to load',
     steps: {
       'check-runtime': 'Checking runtime',
       'start-api': 'Starting API',
@@ -147,6 +149,15 @@ function fillForm(keys) {
   for (const field of FIELDS) {
     $(field).value = keys?.[field] || '';
   }
+  const embed = $('OPENAI_EMBEDDING_MODEL');
+  const current = embed.value.trim();
+  if (
+    !current ||
+    /^text-embedding/i.test(current) ||
+    current.toLowerCase() === 'nomic-embed-text'
+  ) {
+    embed.value = 'BAAI/bge-small-en-v1.5';
+  }
 }
 
 function hasConnection(keys) {
@@ -164,6 +175,11 @@ function connectErrorText(result) {
   if (result?.code === 'TIMEOUT') return strings.connectTimeout;
   if (result?.code === 'NETWORK') {
     return result.message ? `${strings.connectNetwork} ${result.message}` : strings.connectNetwork;
+  }
+  if (result?.code === 'EMBEDDING_ERROR') {
+    return result.message
+      ? `${strings.connectEmbeddingFail}：${result.message}`
+      : strings.connectEmbeddingFail;
   }
   if (result?.message) return `${strings.connectFail}：${result.message}`;
   return strings.connectFail;

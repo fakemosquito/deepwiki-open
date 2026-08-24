@@ -16,7 +16,11 @@ from adalflow.core.types import (
 
 from api.config import configs, get_embedder
 from api.logger import get_logger
-from api.rag.pipeline import DatabaseManager
+from api.rag.pipeline import (
+    EMBEDDING_FAILURE_HINT,
+    DatabaseManager,
+    EmbeddingFailedError,
+)
 
 logger = get_logger(__name__)
 
@@ -277,8 +281,10 @@ class RAG(adal.Component):
         )
 
         if not self.transformed_docs:
-            raise ValueError(
-                "No valid documents with embeddings found. Cannot create retriever."
+            raise EmbeddingFailedError(
+                "No valid documents with embeddings found. Cannot create retriever. "
+                "The embedding API likely failed or returned empty vectors. "
+                f"{EMBEDDING_FAILURE_HINT}"
             )
 
         logger.info(

@@ -12,6 +12,7 @@ from api.clients import (
     GoogleEmbedderClient,
     GoogleGenAIClient,
     LiteLLMClient,
+    LocalEmbedderClient,
     OllamaClient,
     OpenAIClient,
     OpenRouterClient,
@@ -73,6 +74,7 @@ CLIENT_CLASSES = {
     GoogleEmbedderClient.__name__: GoogleEmbedderClient,
     OpenAIClient.__name__: OpenAIClient,
     LiteLLMClient.__name__: LiteLLMClient,
+    LocalEmbedderClient.__name__: LocalEmbedderClient,
     OpenRouterClient.__name__: OpenRouterClient,
     OllamaClient.__name__: OllamaClient,
     BedrockClient.__name__: BedrockClient,
@@ -179,7 +181,13 @@ def load_embedder_config():
     embedder_config = load_json_config("embedder.json")
 
     # Process client classes
-    for key in ["embedder", "embedder_ollama", "embedder_google", "embedder_bedrock"]:
+    for key in [
+        "embedder",
+        "embedder_local",
+        "embedder_ollama",
+        "embedder_google",
+        "embedder_bedrock",
+    ]:
         if key in embedder_config and "client_class" in embedder_config[key]:
             class_name = embedder_config[key]["client_class"]
             if class_name in CLIENT_CLASSES:
@@ -202,6 +210,8 @@ def get_embedder_config():
         return configs.get("embedder_google", {})
     elif embedder_type == "ollama" and "embedder_ollama" in configs:
         return configs.get("embedder_ollama", {})
+    elif embedder_type == "local" and "embedder_local" in configs:
+        return configs.get("embedder_local", {})
     else:
         return configs.get("embedder", {})
 
@@ -267,12 +277,26 @@ def is_bedrock_embedder():
     return client_class == "BedrockClient"
 
 
+def is_local_embedder():
+    """Check if the current embedder configuration uses LocalEmbedderClient."""
+    embedder_config = get_embedder_config()
+    if not embedder_config:
+        return False
+
+    model_client = embedder_config.get("model_client")
+    if model_client:
+        return model_client.__name__ == "LocalEmbedderClient"
+
+    client_class = embedder_config.get("client_class", "")
+    return client_class == "LocalEmbedderClient"
+
+
 def get_embedder_type():
     """
     Get the current embedder type based on configuration.
 
     Returns:
-        str: 'bedrock', 'ollama', 'google', or 'openai' (default)
+        str: 'bedrock', 'ollama', 'google', 'local', or 'openai' (default)
     """
     if is_bedrock_embedder():
         return "bedrock"
@@ -280,6 +304,8 @@ def get_embedder_type():
         return "ollama"
     elif is_google_embedder():
         return "google"
+    elif is_local_embedder():
+        return "local"
     else:
         return "openai"
 
@@ -341,6 +367,7 @@ if generator_config:
 if embedder_config:
     for key in [
         "embedder",
+        "embedder_local",
         "embedder_ollama",
         "embedder_google",
         "embedder_bedrock",
@@ -526,7 +553,7 @@ def get_embedder(
     Args:
         is_local_ollama: Legacy parameter for Ollama embedder
         use_google_embedder: Legacy parameter for Google embedder
-        embedder_type: Direct specification of embedder type ('ollama', 'google', 'bedrock', 'openai')
+        embedder_type: Direct specification of embedder type ('ollama', 'google', 'bedrock', 'local', 'openai')
 
     Returns:
         adal.Embedder: Configured embedder instance
@@ -541,6 +568,8 @@ def get_embedder(
             embedder_config = configs["embedder_google"]
         elif embedder_type == "bedrock":
             embedder_config = configs["embedder_bedrock"]
+        elif embedder_type == "local":
+            embedder_config = configs["embedder_local"]
         else:  # default to openai
             embedder_config = configs["embedder"]
     elif is_local_ollama:
@@ -556,6 +585,8 @@ def get_embedder(
             embedder_config = configs["embedder_ollama"]
         elif current_type == "google":
             embedder_config = configs["embedder_google"]
+        elif current_type == "local":
+            embedder_config = configs["embedder_local"]
         else:
             embedder_config = configs["embedder"]
 

@@ -11,7 +11,7 @@ from api.prompts import (
     DEEP_RESEARCH_INTERMEDIATE_ITERATION_PROMPT,
     SIMPLE_CHAT_SYSTEM_PROMPT,
 )
-from api.rag import RAG, count_tokens, repo_index_exist
+from api.rag import EmbeddingFailedError, RAG, count_tokens, repo_index_exist
 from api.repository import Repo
 from api.schemas.base import RepoRequestBase
 from api.schemas import ChatCompletionRequest
@@ -83,6 +83,9 @@ async def research_chat(
         rag = await prepare_repo_index(request=request)
         logger.info("Retriever prepared for %s", request.repo_url)
 
+    except EmbeddingFailedError as e:
+        logger.error("No valid embeddings found: %s", str(e))
+        raise
     except ValueError as e:
         if "No valid documents with embeddings found" in str(e):
             logger.error(f"No valid embeddings found: {str(e)}")

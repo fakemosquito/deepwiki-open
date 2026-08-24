@@ -6,6 +6,7 @@ from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from api.config import WIKI_AUTH_CODE, WIKI_AUTH_MODE, configs
 from api.repository import normalize_repo_location
 from api.logger import get_logger
 from api.schemas import (

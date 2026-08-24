@@ -1,7 +1,6 @@
 const { app } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
 const {
   API_PORT,
@@ -18,6 +17,7 @@ const {
   readSettings,
   writeDesktopModelConfig,
 } = require('./paths');
+const { waitHttp, waitTcp, probeHttp, probeTcp } = require('./wait');
 
 let apiChild = null;
 let webChild = null;
@@ -75,43 +75,12 @@ function gitExe() {
   return resolveOnPath('git');
 }
 
-function waitHttp(url, timeoutMs) {
-  const started = Date.now();
-  return new Promise((resolve, reject) => {
-    const attempt = () => {
-      const request = http.get(url, (response) => {
-        response.resume();
-        if (response.statusCode && response.statusCode < 500) {
-          resolve();
-          return;
-        }
-        retry();
-      });
-      request.on('error', retry);
-      request.setTimeout(2500, () => {
-        request.destroy();
-        retry();
-      });
-    };
-    const retry = () => {
-      if (Date.now() - started > timeoutMs) {
-        reject(new Error(`Timeout waiting for ${url}`));
-        return;
-      }
-      setTimeout(attempt, 1500);
-    };
-    attempt();
-  });
-}
-
 async function isStackReady() {
-  try {
-    await waitHttp(`http://127.0.0.1:${API_PORT}/health`, 1200);
-    await waitHttp(`http://127.0.0.1:${FRONTEND_PORT}`, 1200);
-    return true;
-  } catch {
-    return false;
-  }
+  const [apiOk, webOk] = await Promise.all([
+    probeHttp(`http://127.0.0.1:${API_PORT}/health`),
+    probeTcp(FRONTEND_PORT),
+  ]);
+  return apiOk && webOk;
 }
 
 function appendLog(filePath, chunk) {
@@ -180,7 +149,8 @@ function runtimeEnv(paths) {
     LOG_FILE_PATH: path.join(paths.logDir, 'application.log'),
     TIKTOKEN_CACHE_DIR: path.join(getRuntimeRoot(), 'tiktoken_cache'),
     DEEPWIKI_CONFIG_DIR: paths.configDir,
-    DEEPWIKI_EMBEDDER_TYPE: 'openai',
+    DEEPWIKI_EMBEDDER_TYPE: 'local',
+    FASTEMBED_CACHE_PATH: path.join(paths.root, 'models'),
     HOME: paths.root,
     USERPROFILE: paths.root,
     PYTHONUTF8: '1',
@@ -246,16 +216,28 @@ function startWeb(node, env, logFile) {
   if (!app.isPackaged) {
     const nextBin = path.join(getAppRoot(), 'node_modules', 'next', 'dist', 'bin', 'next');
     if (exists(nextBin)) {
-      webChild = spawnLogged(node, [nextBin, 'dev', '--port', String(FRONTEND_PORT)], {
-        cwd: getAppRoot(),
-        env: {
-          ...env,
-          NODE_ENV: 'development',
-          PORT: String(FRONTEND_PORT),
-        },
-        logFile,
-        name: 'web',
-      });
+      webChild = spawnLogged(
+        node,
+        [
+          nextBin,
+          'dev',
+          '--turbopack',
+          '--port',
+          String(FRONTEND_PORT),
+          '--hostname',
+          '127.0.0.1',
+        ],
+        {
+          cwd: getAppRoot(),
+          env: {
+            ...env,
+            NODE_ENV: 'development',
+            PORT: String(FRONTEND_PORT),
+          },
+          logFile,
+          name: 'web',
+        }
+      );
       return;
     }
   }
@@ -298,8 +280,10 @@ async function startStack(emit) {
 
   emit?.({ step: 'health' });
   try {
-    await waitHttp(`http://127.0.0.1:${API_PORT}/health`, 180000);
-    await waitHttp(`http://127.0.0.1:${FRONTEND_PORT}`, 180000);
+    await Promise.all([
+      waitHttp(`http://127.0.0.1:${API_PORT}/health`, 180000, 1500),
+      waitTcp(FRONTEND_PORT, 180000),
+    ]);
   } catch (error) {
     const logHint = `\nSee logs in ${paths.logDir}`;
     error.message = `${error.message}${logHint}`;

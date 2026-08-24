@@ -50,6 +50,16 @@ interface WikiStructure {
   rootSections: string[];
 }
 
+function isEmbeddingErrorMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('embedding') ||
+    lower.includes('retriever') ||
+    lower.includes('no valid documents') ||
+    (lower.includes('ollama') && lower.includes('not found'))
+  );
+}
+
 // Add CSS styles for wiki with Japanese aesthetic
 const wikiStyles = `
   .prose code {
@@ -494,7 +504,11 @@ export default function RepoWikiPage() {
       const model = isCustomSelectedModelState ? customSelectedModelState : selectedModelState;
       const resolvedRepoUrl = getRepoUrl(effectiveRepoInfo);
       if (!resolvedRepoUrl) {
-        setError(messages.repoPage?.errorMessageDefault || 'Missing repository URL or local folder path.');
+        setError(
+          messages.repoPage?.missingRepoUrl ||
+            messages.form?.invalidRepo ||
+            'Missing repository URL or local folder path.'
+        );
         setIsLoading(false);
         setLoadingMessage(undefined);
         return;
@@ -553,7 +567,7 @@ export default function RepoWikiPage() {
           // terminal event; try the cache before surfacing an error.
           const ok = await loadWikiFromServerCache();
           if (ok) return;
-          if (message.toLowerCase().includes('ollama') && message.toLowerCase().includes('not found')) {
+          if (isEmbeddingErrorMessage(message)) {
             setEmbeddingError(true);
           }
           setError(message);
@@ -563,7 +577,11 @@ export default function RepoWikiPage() {
       });
     } catch (err) {
       console.error('Error starting wiki generation:', err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      const message = err instanceof Error ? err.message : 'An unknown error occurred';
+      if (isEmbeddingErrorMessage(message)) {
+        setEmbeddingError(true);
+      }
+      setError(message);
       setIsLoading(false);
       setLoadingMessage(undefined);
     }
@@ -954,13 +972,12 @@ export default function RepoWikiPage() {
               <span className="font-bold font-serif">{messages.repoPage?.errorTitle || messages.common?.error || 'Error'}</span>
             </div>
             <p className="text-[var(--foreground)] text-sm mb-3">{error}</p>
-            <p className="text-[var(--muted)] text-xs">
-              {embeddingError ? (
-                messages.repoPage?.embeddingErrorDefault || 'This error is related to the document embedding system used for analyzing your repository. Please verify your embedding model configuration, API keys, and try again. If the issue persists, consider switching to a different embedding provider in the model settings.'
-              ) : (
-                messages.repoPage?.errorMessageDefault || 'Please check that your repository exists and is public. Valid formats are "owner/repo", "https://github.com/owner/repo", "https://gitlab.com/owner/repo", "https://bitbucket.org/owner/repo", or local folder paths like "C:\\path\\to\\folder" or "/path/to/folder".'
-              )}
-            </p>
+            {embeddingError ? (
+              <p className="text-[var(--muted)] text-xs">
+                {messages.repoPage?.embeddingErrorDefault ||
+                  'This is an embedding failure, not a repository URL problem. Wiki generation needs a working embeddings endpoint. Check the embedding model name and that the provider exposes POST /embeddings.'}
+              </p>
+            ) : null}
             <div className="mt-5">
               <Link
                 href="/"

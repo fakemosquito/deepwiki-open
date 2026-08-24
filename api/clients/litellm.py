@@ -1,8 +1,9 @@
 import os
 from typing import Callable, Optional
 
-from adalflow.components.model_client.openai_client import OpenAIClient
 from openai import AsyncOpenAI, OpenAI
+
+from .openai import OpenAIClient
 
 
 class LiteLLMClient(OpenAIClient):

@@ -20,6 +20,102 @@ logger = get_logger(__name__)
 # Maximum token limit for OpenAI embedding models
 MAX_EMBEDDING_TOKENS = 8192
 
+EMBEDDING_FAILURE_HINT = (
+    "Wiki indexing needs a working embedding model. "
+    "Desktop mode runs BAAI/bge-small-en-v1.5 locally via FastEmbed; "
+    "the chat gateway does not need POST /embeddings. "
+    "Install fastembed if the local model failed to load."
+)
+
+
+class EmbeddingFailedError(ValueError):
+    """Raised when the embedding provider returns no usable vectors."""
+
+
+def _embedding_vector_length(doc: Document) -> int:
+    vector = getattr(doc, "vector", None)
+    if vector is None:
+        return 0
+    try:
+        if hasattr(vector, "shape"):
+            if len(vector.shape) == 0:
+                return 0
+            return int(vector.shape[-1])
+        if hasattr(vector, "__len__") and not isinstance(vector, (str, bytes)):
+            return int(len(vector))
+    except Exception:
+        return 0
+    return 0
+
+
+def _summarize_embedder_failure(output=None, exc: Exception | None = None) -> str:
+    if exc is not None:
+        text = str(exc)
+    else:
+        error = getattr(output, "error", None)
+        raw = getattr(output, "raw_response", None)
+        text = str(error or raw or output or "")
+    compact = " ".join(text.split())
+    lowered = compact.lower()
+    if "404" in compact:
+        return (
+            "HTTP 404 from the embeddings endpoint. "
+            "The chat API may work while POST /embeddings is missing "
+            "or the embedding model name is wrong."
+        )
+    if "<html" in lowered:
+        return "The embeddings endpoint returned HTML instead of JSON."
+    if compact:
+        return compact[:400]
+    return "the embedder returned no vectors"
+
+
+def _embedder_output_has_vectors(output) -> bool:
+    if output is None:
+        return False
+    data = getattr(output, "data", None)
+    if data is None and isinstance(output, (list, tuple)):
+        data = output
+    if not data:
+        return False
+    for item in data:
+        embedding = getattr(item, "embedding", None)
+        if embedding is None:
+            embedding = item
+        if embedding is None or isinstance(embedding, (str, bytes)):
+            continue
+        try:
+            if hasattr(embedding, "shape"):
+                if len(embedding.shape) == 0:
+                    continue
+                if int(embedding.shape[-1]) > 0:
+                    return True
+                continue
+            if hasattr(embedding, "__len__") and len(embedding) > 0:
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def assert_embedder_ready(embedder) -> None:
+    """Fail fast if the configured embedder cannot produce a single vector."""
+    try:
+        output = embedder("deepwiki embedding preflight")
+    except EmbeddingFailedError:
+        raise
+    except Exception as e:
+        raise EmbeddingFailedError(
+            f"Embedding API failed: {_summarize_embedder_failure(exc=e)}. {EMBEDDING_FAILURE_HINT}"
+        ) from e
+
+    if _embedder_output_has_vectors(output):
+        return
+
+    raise EmbeddingFailedError(
+        f"Embedding API failed: {_summarize_embedder_failure(output)}. {EMBEDDING_FAILURE_HINT}"
+    )
+
 
 def count_tokens(
     text: str, embedder_type: str = None, is_ollama_embedder: bool = None
@@ -49,8 +145,8 @@ def count_tokens(
             embedder_type = get_embedder_type()
 
         # Choose encoding based on embedder type
-        if embedder_type == "ollama":
-            # Ollama typically uses cl100k_base encoding
+        if embedder_type in ("ollama", "local"):
+            # Local ONNX / Ollama models: cl100k_base is a close length estimate
             encoding = tiktoken.get_encoding("cl100k_base")
         elif embedder_type == "google":
             # Google uses similar tokenization to GPT models for rough estimation
@@ -413,24 +509,20 @@ class DatabaseManager:
             List[Document]: List of Document objects
         """
 
-        def _embedding_vector_length(doc: Document) -> int:
-            vector = getattr(doc, "vector", None)
-            if vector is None:
-                return 0
-            try:
-                if hasattr(vector, "shape"):
-                    if len(vector.shape) == 0:
-                        return 0
-                    return int(vector.shape[-1])
-                if hasattr(vector, "__len__"):
-                    return int(len(vector))
-            except Exception:
-                return 0
-            return 0
-
         # Handle backward compatibility
         if embedder_type is None and is_ollama_embedder is not None:
             embedder_type = "ollama" if is_ollama_embedder else None
+
+        try:
+            embedder = get_embedder(embedder_type=embedder_type)
+        except EmbeddingFailedError:
+            raise
+        except Exception as e:
+            raise EmbeddingFailedError(
+                f"Failed to initialize embedder: {e}. {EMBEDDING_FAILURE_HINT}"
+            ) from e
+        assert_embedder_ready(embedder)
+
         # check the database
         if self.repo_paths and os.path.exists(self.repo_paths["save_db_file"]):
             logger.info("Loading existing database...")
@@ -456,6 +548,8 @@ class DatabaseManager:
                         )
                     else:
                         return documents
+            except EmbeddingFailedError:
+                raise
             except Exception as e:
                 logger.error(f"Error loading existing database: {e}")
                 # Continue to create a new database
@@ -476,6 +570,25 @@ class DatabaseManager:
         logger.info(f"Total documents: {len(documents)}")
         transformed_docs = self.db.get_transformed_data(key="split_and_embed")
         logger.info(f"Total transformed documents: {len(transformed_docs)}")
+        usable = sum(
+            1 for doc in transformed_docs or [] if _embedding_vector_length(doc) > 0
+        )
+        if usable == 0:
+            db_path = self.repo_paths["save_db_file"]
+            try:
+                if os.path.exists(db_path):
+                    os.remove(db_path)
+                    logger.warning(
+                        "Removed embedding database with no usable vectors: %s", db_path
+                    )
+            except OSError as e:
+                logger.warning(
+                    "Failed to remove empty embedding database %s: %s", db_path, e
+                )
+            raise EmbeddingFailedError(
+                "No valid documents with embeddings found. Cannot create retriever. "
+                f"{EMBEDDING_FAILURE_HINT}"
+            )
         return transformed_docs
 
     def prepare_retriever(
