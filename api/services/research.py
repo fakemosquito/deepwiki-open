@@ -1,4 +1,5 @@
 import asyncio
+from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable
 from functools import partial
 
@@ -12,6 +13,7 @@ from api.prompts import (
     SIMPLE_CHAT_SYSTEM_PROMPT,
 )
 from api.rag import EmbeddingFailedError, RAG, count_tokens, repo_index_exist
+from api.rag.rag import Memory
 from api.repository import Repo
 from api.schemas.base import RepoRequestBase
 from api.schemas import ChatCompletionRequest
@@ -25,6 +27,24 @@ MAX_INPUT_TOKENS = 7500  # Safe threshold below 8192 token limit
 
 class RepoNotIndexedError(ValueError):
     """Raised when a chat request arrives before the repo has been indexed."""
+
+
+_INDEX_CACHE_MAX = 4
+_index_cache: OrderedDict[str, tuple[list, object]] = OrderedDict()
+_index_cache_lock = asyncio.Lock()
+
+
+def _index_cache_key(request: RepoRequestBase) -> str:
+    return "\x1f".join(
+        [
+            request.repo_url or "",
+            request.type or "",
+            ",".join(request.excluded_dirs or []),
+            ",".join(request.excluded_files or []),
+            ",".join(request.included_dirs or []),
+            ",".join(request.included_files or []),
+        ]
+    )
 
 
 async def prepare_repo_index(
@@ -45,6 +65,17 @@ async def prepare_repo_index(
     if request.included_files:
         logger.info(f"Using custom included files: {request.included_files}")
 
+    key = _index_cache_key(request)
+    async with _index_cache_lock:
+        cached = _index_cache.get(key)
+        if cached is not None:
+            _index_cache.move_to_end(key)
+            docs, retriever = cached
+            rag.transformed_docs = docs
+            rag.retriever = retriever
+            rag.memory = Memory()
+            return rag
+
     await rag.aprepare_retriever(
         request.repo_url,
         request.type,
@@ -54,6 +85,12 @@ async def prepare_repo_index(
         included_files=request.included_files,
         included_dirs=request.included_dirs,
     )
+
+    async with _index_cache_lock:
+        _index_cache[key] = (rag.transformed_docs, rag.retriever)
+        _index_cache.move_to_end(key)
+        while len(_index_cache) > _INDEX_CACHE_MAX:
+            _index_cache.popitem(last=False)
     return rag
 
 

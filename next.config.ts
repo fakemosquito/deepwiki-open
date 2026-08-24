@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   // Optimize build for Docker
   experimental: {
-    optimizePackageImports: ['@mermaid-js/mermaid', 'react-syntax-highlighter'],
+    optimizePackageImports: ['mermaid', 'react-syntax-highlighter'],
   },
   // Reduce memory usage during build
   webpack: (config, { isServer }) => {

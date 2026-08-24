@@ -3,15 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { FaWikipediaW, FaGithub, FaCoffee, FaTwitter, FaFolderOpen } from 'react-icons/fa';
 import ThemeToggle from '@/components/theme-toggle';
-import Mermaid from '../components/Mermaid';
 import ConfigurationModal from '@/components/ConfigurationModal';
 import ProcessedProjects from '@/components/ProcessedProjects';
 import { parseRepositoryInput } from '@/utils/parseRepositoryInput';
 import { useProcessedProjects } from '@/hooks/useProcessedProjects';
 
 import { useLanguage } from '@/contexts/LanguageContext';
+
+const Mermaid = dynamic(() => import('@/components/Mermaid'), {
+  ssr: false,
+  loading: () => <div className="h-40 animate-pulse rounded bg-[var(--background)]/50" />,
+});
 
 // Define the demo mermaid charts outside the component
 const DEMO_FLOW_CHART = `graph TD

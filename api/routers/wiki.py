@@ -271,6 +271,25 @@ async def get_wiki_task(task_id: str):
     return task.to_status()
 
 
+def _sse_status_json(task: WikiTask) -> str:
+    status = task.to_status()
+    structure = status.wiki_structure
+    if structure is not None:
+        status = status.model_copy(
+            update={
+                "wiki_structure": structure.model_copy(
+                    update={
+                        "pages": [
+                            page.model_copy(update={"content": ""})
+                            for page in structure.pages
+                        ]
+                    }
+                )
+            }
+        )
+    return status.model_dump_json()
+
+
 @router.get("/wiki/tasks/{task_id}/stream")
 async def stream_wiki_task(task_id: str):
     """SSE progress stream: `progress` events until a terminal `done`/`error`."""
@@ -284,8 +303,9 @@ async def stream_wiki_task(task_id: str):
                 yield 'event: error\ndata: {"error": "task no longer available"}\n\n'
                 return
 
-            # we use wiki task status, so that frontend could show the current processing pages.
-            payload = task.to_status().model_dump_json()
+            # Progress events omit page bodies so the UI is not parsing megabytes
+            # of markdown every second while generation is still running.
+            payload = _sse_status_json(task)
             if task.status == TaskStatus.COMPLETED:
                 yield f"event: done\ndata: {payload}\n\n"
                 return

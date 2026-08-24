@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FaChevronRight, FaChevronDown } from 'react-icons/fa';
 
 // Import interfaces from the page component
@@ -51,6 +51,15 @@ const WikiTreeView: React.FC<WikiTreeViewProps> = ({
     new Set(wikiStructure.rootSections)
   );
 
+  const pageById = useMemo(
+    () => new Map(wikiStructure.pages.map(page => [page.id, page])),
+    [wikiStructure.pages],
+  );
+  const sectionById = useMemo(
+    () => new Map(wikiStructure.sections.map(section => [section.id, section])),
+    [wikiStructure.sections],
+  );
+
   const toggleSection = (sectionId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     setExpandedSections(prev => {
@@ -65,7 +74,7 @@ const WikiTreeView: React.FC<WikiTreeViewProps> = ({
   };
 
   const renderSection = (sectionId: string, level = 0) => {
-    const section = wikiStructure.sections.find(s => s.id === sectionId);
+    const section = sectionById.get(sectionId);
     if (!section) return null;
 
     const isExpanded = expandedSections.has(sectionId);
@@ -90,7 +99,7 @@ const WikiTreeView: React.FC<WikiTreeViewProps> = ({
           <div className={`ml-4 mt-1 space-y-1 ${level > 0 ? 'pl-2 border-l border-[var(--border-color)]/30' : ''}`}>
             {/* Render pages in this section */}
             {section.pages.map(pageId => {
-              const page = wikiStructure.pages.find(p => p.id === pageId);
+              const page = pageById.get(pageId);
               if (!page) return null;
 
               return (
@@ -131,7 +140,6 @@ const WikiTreeView: React.FC<WikiTreeViewProps> = ({
 
   // If there are no sections defined yet, or if sections/rootSections are empty arrays, fall back to the flat list view
   if (!wikiStructure.sections || wikiStructure.sections.length === 0 || !wikiStructure.rootSections || wikiStructure.rootSections.length === 0) {
-    console.log("WikiTreeView: Falling back to flat list view due to missing or empty sections/rootSections");
     return (
       <ul className="space-y-2">
         {wikiStructure.pages.map(page => (
@@ -163,16 +171,11 @@ const WikiTreeView: React.FC<WikiTreeViewProps> = ({
     );
   }
 
-  // Log information about the sections for debugging
-  console.log("WikiTreeView: Rendering tree view with sections:", wikiStructure.sections);
-  console.log("WikiTreeView: Root sections:", wikiStructure.rootSections);
-
   return (
     <div className="space-y-1">
       {wikiStructure.rootSections.map(sectionId => {
-        const section = wikiStructure.sections.find(s => s.id === sectionId);
+        const section = sectionById.get(sectionId);
         if (!section) {
-          console.warn(`WikiTreeView: Could not find section with id ${sectionId}`);
           return null;
         }
         return renderSection(sectionId);
@@ -181,4 +184,4 @@ const WikiTreeView: React.FC<WikiTreeViewProps> = ({
   );
 };
 
-export default WikiTreeView;
+export default React.memo(WikiTreeView);

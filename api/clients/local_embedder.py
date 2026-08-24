@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
+import threading
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
@@ -49,21 +51,24 @@ class LocalEmbedderClient(ModelClient):
         ).strip() or None
         self._model = None
         self._loaded_name = None
+        self._infer_lock = threading.Lock()
 
     def __getstate__(self):
         state = self.__dict__.copy()
         state["_model"] = None
         state["_loaded_name"] = None
+        state.pop("_infer_lock", None)
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
         self._model = None
         self._loaded_name = None
+        self._infer_lock = threading.Lock()
 
     def to_dict(self, exclude: Optional[list] = None) -> Dict[str, Any]:
         exclude = list(exclude or [])
-        for key in ("_model", "_loaded_name"):
+        for key in ("_model", "_loaded_name", "_infer_lock"):
             if key not in exclude:
                 exclude.append(key)
         return super().to_dict(exclude=exclude)
@@ -73,6 +78,7 @@ class LocalEmbedderClient(ModelClient):
         obj = super().from_dict(data)
         obj._model = None
         obj._loaded_name = None
+        obj._infer_lock = threading.Lock()
         if not getattr(obj, "_model_name", None):
             obj._model_name = DEFAULT_MODEL
         return obj
@@ -121,9 +127,14 @@ class LocalEmbedderClient(ModelClient):
             return {"embeddings": []}
         model_name = api_kwargs.get("model") or self._model_name
         self._ensure_model(model_name)
+        with self._infer_lock:
+            raw = list(self._model.embed(list(texts), parallel=None))
         vectors = []
-        for item in self._model.embed(list(texts), parallel=None):
-            vectors.append([float(value) for value in item])
+        for item in raw:
+            if hasattr(item, "tolist"):
+                vectors.append(item.tolist())
+            else:
+                vectors.append(list(item))
         return {"embeddings": vectors}
 
     async def acall(
@@ -131,7 +142,7 @@ class LocalEmbedderClient(ModelClient):
         api_kwargs: Dict = None,
         model_type: ModelType = ModelType.UNDEFINED,
     ):
-        return self.call(api_kwargs, model_type)
+        return await asyncio.to_thread(self.call, api_kwargs, model_type)
 
     def parse_embedding_response(self, response) -> EmbedderOutput:
         try:
@@ -209,7 +220,7 @@ def _load_text_embedding(model_name: str, cache_dir: Optional[str]):
         "model_name": model_name,
         "specific_model_path": str(model_dir),
         "lazy_load": False,
-        "threads": 1,
+        "threads": max(1, min(4, (os.cpu_count() or 2) - 1)),
     }
     if cache_dir:
         kwargs["cache_dir"] = cache_dir

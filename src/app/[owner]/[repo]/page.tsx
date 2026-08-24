@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
-import Ask from '@/components/Ask';
 import CodeViewer, { CodeTarget } from '@/components/CodeViewer';
 import Markdown from '@/components/Markdown';
 import ModelSelectionModal from '@/components/ModelSelectionModal';
@@ -20,6 +19,9 @@ import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaBitbucket, FaBookOpen, FaComments, FaDownload, FaExclamationTriangle, FaFileExport, FaFolder, FaGithub, FaGitlab, FaGlobe, FaHome, FaSync, FaTimes } from 'react-icons/fa';
+import dynamic from 'next/dynamic';
+
+const Ask = dynamic(() => import('@/components/Ask'), { ssr: false });
 // Define the WikiSection and WikiStructure types directly in this file
 // since the imported types don't have the sections and rootSections properties
 interface WikiSection {
@@ -208,6 +210,7 @@ export default function RepoWikiPage() {
 
   // State for Ask modal
   const [isAskModalOpen, setIsAskModalOpen] = useState(false);
+  const [askOpened, setAskOpened] = useState(false);
   const askComponentRef = useRef<{ clearConversation: () => void } | null>(null);
 
   // Code viewer drawer (rendered at modal level so its header isn't clipped by
@@ -542,7 +545,17 @@ export default function RepoWikiPage() {
 
       // Otherwise follow the (new or joined) task via its SSE progress stream.
       const applyStatus = (status: WikiTaskStatusDto) => {
-        setGenerationProgress(status);
+        setGenerationProgress(prev => {
+          if (
+            prev &&
+            prev.status === status.status &&
+            prev.pages_done === status.pages_done &&
+            (prev.current_page_ids || []).join() === (status.current_page_ids || []).join()
+          ) {
+            return prev;
+          }
+          return status;
+        });
         setLoadingMessage(messageForStatus(status.status));
         if (status.wiki_structure) {
           const structure = toWikiStructure(status.wiki_structure);
@@ -1165,7 +1178,7 @@ export default function RepoWikiPage() {
       {/* Floating Chat Button */}
       {!isLoading && wikiStructure && (
         <button
-          onClick={() => { setIsAskModalOpen(true); setCodeViewerOpen(false); }}
+          onClick={() => { setAskOpened(true); setIsAskModalOpen(true); setCodeViewerOpen(false); }}
           className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-[var(--accent-primary)] text-white shadow-lg flex items-center justify-center hover:bg-[var(--accent-primary)]/90 transition-all z-50"
           aria-label={messages.ask?.title || 'Ask about this repository'}
         >
@@ -1173,8 +1186,9 @@ export default function RepoWikiPage() {
         </button>
       )}
 
-      {/* Ask Modal - Always render but conditionally show/hide */}
-      <div className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ${isAskModalOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      {/* Ask Modal - mount on first open, hide with CSS to keep conversation */}
+      {(isAskModalOpen || askOpened) && (
+      <div className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 ${isAskModalOpen ? '' : 'hidden'}`}>
         <div className="bg-[var(--card-bg)] rounded-lg shadow-xl w-full max-w-7xl h-[90vh] flex flex-col relative overflow-hidden">
           {/* Close the whole panel */}
           <div className="flex items-center justify-end p-3 absolute top-0 right-0 z-30">
@@ -1226,6 +1240,7 @@ export default function RepoWikiPage() {
           </div>
         </div>
       </div>
+      )}
 
       <ModelSelectionModal
         isOpen={isModelSelectionModalOpen}

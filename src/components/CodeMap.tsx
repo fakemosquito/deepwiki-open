@@ -1,8 +1,6 @@
 'use client';
 
 import React from 'react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { tomorrow } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import Mermaid from './Mermaid';
 import type { CodemapCitation, CodemapData, CodemapPhase } from '@/utils/websocketClient';
 
@@ -138,13 +136,9 @@ const CodeMap: React.FC<CodeMapProps> = ({ data, phaseStatus, error, onCitationC
                   )}
                 </div>
                 {step.code && (
-                  <SyntaxHighlighter
-                    language="text"
-                    style={tomorrow}
-                    customStyle={{ margin: 0, fontSize: '0.72rem', borderRadius: '0.25rem' }}
-                  >
-                    {step.code}
-                  </SyntaxHighlighter>
+                  <pre className="m-0 p-2 overflow-auto text-[0.72rem] rounded bg-gray-900 text-gray-100">
+                    <code>{step.code}</code>
+                  </pre>
                 )}
               </div>
             ))}
@@ -155,4 +149,4 @@ const CodeMap: React.FC<CodeMapProps> = ({ data, phaseStatus, error, onCitationC
   );
 };
 
-export default CodeMap;
+export default React.memo(CodeMap);

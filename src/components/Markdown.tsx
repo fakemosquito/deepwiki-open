@@ -1,21 +1,46 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import Mermaid from './Mermaid';
 import 'katex/dist/katex.min.css';
 
+const SyntaxHighlighter = dynamic(
+  () => import('react-syntax-highlighter').then((mod) => mod.Prism),
+  { ssr: false, loading: () => <pre className="p-4 text-sm overflow-auto" /> },
+);
+
+const REMARK_PLUGINS = [remarkGfm, remarkMath];
+const REMARK_PLUGINS_NO_MATH = [remarkGfm];
+const REHYPE_PLUGINS = [rehypeRaw, rehypeKatex];
+const REHYPE_PLUGINS_NO_MATH = [rehypeRaw];
+
 interface MarkdownProps {
   content: string;
+  /** Skip Mermaid/Prism/KaTeX while tokens are still arriving. */
+  streaming?: boolean;
 }
 
-const Markdown: React.FC<MarkdownProps> = ({ content }) => {
-  // Define markdown components
-  const MarkdownComponents: React.ComponentProps<typeof ReactMarkdown>['components'] = {
+const PlainCodeBlock: React.FC<{ language?: string; code: string }> = ({
+  language,
+  code,
+}) => (
+  <div className="my-6 rounded-md overflow-hidden text-sm shadow-sm">
+    {language ? (
+      <div className="bg-gray-800 text-gray-200 px-5 py-2 text-sm">{language}</div>
+    ) : null}
+    <pre className="m-0 p-4 overflow-auto text-sm bg-gray-900 text-gray-100">
+      <code>{code}</code>
+    </pre>
+  </div>
+);
+
+function createMarkdownComponents(streaming: boolean) {
+  return {
     p({ children, ...props }: { children?: React.ReactNode }) {
       return <p className="mb-3 text-sm leading-relaxed dark:text-white" {...props}>{children}</p>;
     },
@@ -23,7 +48,6 @@ const Markdown: React.FC<MarkdownProps> = ({ content }) => {
       return <h1 className="text-xl font-bold mt-6 mb-3 dark:text-white" {...props}>{children}</h1>;
     },
     h2({ children, ...props }: { children?: React.ReactNode }) {
-      // Special styling for ReAct headings
       if (children && typeof children === 'string') {
         const text = children.toString();
         if (text.includes('Thought') || text.includes('Action') || text.includes('Observation') || text.includes('Answer')) {
@@ -119,27 +143,31 @@ const Markdown: React.FC<MarkdownProps> = ({ content }) => {
       className?: string;
       children?: React.ReactNode;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      [key: string]: any; // Using any here as it's required for ReactMarkdown components
+      [key: string]: any;
     }) {
       const { inline, className, children, ...otherProps } = props;
       const match = /language-(\w+)/.exec(className || '');
       const codeContent = children ? String(children).replace(/\n$/, '') : '';
 
-      // Handle Mermaid diagrams
       if (!inline && match && match[1] === 'mermaid') {
+        if (streaming) {
+          return <PlainCodeBlock language="mermaid" code={codeContent} />;
+        }
         return (
           <div className="my-8 bg-gray-50 dark:bg-gray-800 rounded-md overflow-hidden shadow-sm">
             <Mermaid
               chart={codeContent}
               className="w-full max-w-full"
-              zoomingEnabled={true}
+              zoomingEnabled={false}
             />
           </div>
         );
       }
 
-      // Handle code blocks
       if (!inline && match) {
+        if (streaming) {
+          return <PlainCodeBlock language={match[1]} code={codeContent} />;
+        }
         return (
           <div className="my-6 rounded-md overflow-hidden text-sm shadow-sm">
             <div className="bg-gray-800 text-gray-200 px-5 py-2 text-sm flex justify-between items-center">
@@ -172,9 +200,9 @@ const Markdown: React.FC<MarkdownProps> = ({ content }) => {
               style={tomorrow}
               className="!text-sm"
               customStyle={{ margin: 0, borderRadius: '0 0 0.375rem 0.375rem', padding: '1rem' }}
-              showLineNumbers={true}
-              wrapLines={true}
-              wrapLongLines={true}
+              showLineNumbers={false}
+              wrapLines={false}
+              wrapLongLines={false}
               {...otherProps}
             >
               {codeContent}
@@ -183,7 +211,6 @@ const Markdown: React.FC<MarkdownProps> = ({ content }) => {
         );
       }
 
-      // Handle inline code
       return (
         <code
           className={`${className} font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-pink-500 dark:text-pink-400 text-sm`}
@@ -193,19 +220,36 @@ const Markdown: React.FC<MarkdownProps> = ({ content }) => {
         </code>
       );
     },
-  };
+  } as React.ComponentProps<typeof ReactMarkdown>['components'];
+}
 
-  return (
-    <div className="prose prose-base dark:prose-invert max-w-none px-2 py-4">
+const STATIC_COMPONENTS = createMarkdownComponents(false);
+const STREAMING_COMPONENTS = createMarkdownComponents(true);
+
+const Markdown: React.FC<MarkdownProps> = ({ content, streaming = false }) => {
+  const enableMath = !streaming && content.includes('$');
+  const remarkPlugins = enableMath ? REMARK_PLUGINS : REMARK_PLUGINS_NO_MATH;
+  const rehypePlugins = enableMath ? REHYPE_PLUGINS : REHYPE_PLUGINS_NO_MATH;
+  const components = streaming ? STREAMING_COMPONENTS : STATIC_COMPONENTS;
+
+  const rendered = useMemo(
+    () => (
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeRaw, rehypeKatex]}
-        components={MarkdownComponents}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={components}
       >
         {content}
       </ReactMarkdown>
+    ),
+    [content, remarkPlugins, rehypePlugins, components],
+  );
+
+  return (
+    <div className="prose prose-base dark:prose-invert max-w-none px-2 py-4">
+      {rendered}
     </div>
   );
 };
 
-export default Markdown;
+export default React.memo(Markdown);

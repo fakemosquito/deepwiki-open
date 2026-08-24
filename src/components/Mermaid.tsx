@@ -1,11 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import mermaid from 'mermaid';
 import { preprocessMermaidChart } from '@/utils/mermaid';
-// We'll use dynamic import for svg-pan-zoom
 
-// Initialize mermaid with defaults - Japanese aesthetic
-mermaid.initialize({
-  startOnLoad: true,
+type MermaidAPI = typeof import('mermaid').default;
+let mermaidLoader: Promise<MermaidAPI> | null = null;
+
+async function getMermaid(): Promise<MermaidAPI> {
+  if (!mermaidLoader) {
+    mermaidLoader = import('mermaid').then((mod) => {
+      const mermaid = mod.default;
+      mermaid.initialize({
+        startOnLoad: false,
   theme: 'neutral',
   securityLevel: 'loose',
   suppressErrorRendering: true,
@@ -166,9 +170,14 @@ mermaid.initialize({
       filter: brightness(0.95);
     }
   `,
-  fontFamily: 'var(--font-geist-sans), var(--font-serif-jp), sans-serif',
-  fontSize: 12,
-});
+        fontFamily: 'var(--font-geist-sans), var(--font-serif-jp), sans-serif',
+        fontSize: 12,
+      });
+      return mermaid;
+    });
+  }
+  return mermaidLoader;
+}
 
 interface MermaidProps {
   chart: string;
@@ -311,6 +320,7 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
   const mermaidRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(`mermaid-${Math.random().toString(36).substring(2, 9)}`);
+  const lastChartRef = useRef('');
   const isDarkModeRef = useRef(
     typeof window !== 'undefined' &&
     window.matchMedia &&
@@ -358,15 +368,16 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
     if (!chart) return;
 
     let isMounted = true;
+    const processedChart = preprocessMermaidChart(chart);
+    if (lastChartRef.current === processedChart && svg) return;
 
     const renderChart = async () => {
       if (!isMounted) return;
 
       try {
         setError(null);
-        setSvg('');
 
-        const processedChart = preprocessMermaidChart(chart);
+        const mermaid = await getMermaid();
         const { svg: renderedSvg } = await mermaid.render(idRef.current, processedChart);
 
         if (!isMounted) return;
@@ -376,12 +387,8 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
           processedSvg = processedSvg.replace('<svg ', '<svg data-theme="dark" ');
         }
 
+        lastChartRef.current = processedChart;
         setSvg(processedSvg);
-
-        // Call mermaid.contentLoaded to ensure proper initialization
-        setTimeout(() => {
-          mermaid.contentLoaded();
-        }, 50);
       } catch (err) {
         console.error('Mermaid rendering error:', err);
 
@@ -393,14 +400,14 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
           if (mermaidRef.current) {
             mermaidRef.current.innerHTML = `
               <div class="text-red-500 dark:text-red-400 text-xs mb-1">Syntax error in diagram</div>
-              <pre class="text-xs overflow-auto p-2 bg-gray-100 dark:bg-gray-800 rounded">${preprocessMermaidChart(chart)}</pre>
+              <pre class="text-xs overflow-auto p-2 bg-gray-100 dark:bg-gray-800 rounded">${processedChart}</pre>
             `;
           }
         }
       }
     };
 
-    renderChart();
+    void renderChart();
 
     return () => {
       isMounted = false;
@@ -489,4 +496,4 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
 
 
 
-export default Mermaid;
+export default React.memo(Mermaid);

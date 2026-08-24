@@ -19,6 +19,7 @@ import {
   CodemapCitation,
   CodemapPhase,
 } from '@/utils/websocketClient';
+import { createStreamBuffer } from '@/utils/streamBuffer';
 
 const DONE_PHASES: Record<CodemapPhase, PhaseStatus> = {
   analyzing: 'done',
@@ -174,15 +175,12 @@ const Ask: React.FC<AskProps> = ({
     }
   }, [onRef]);
 
-  // Keep the newest content in view as the conversation grows or streams.
+  // Keep the newest content in view without smooth-scrolling on every token.
   useEffect(() => {
     if (responseRef.current) {
       responseRef.current.scrollTop = responseRef.current.scrollHeight;
     }
-    if (conversationEndRef.current) {
-      conversationEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-  }, [response, conversationTurns]);
+  }, [response]);
 
   // Close WebSocket when component unmounts
   useEffect(() => {
@@ -199,8 +197,6 @@ const Ask: React.FC<AskProps> = ({
   useEffect(() => {
     const fetchModel = async () => {
       try {
-        setIsLoading(true);
-
         const response = await fetch('/api/models/config');
         if (!response.ok) {
           throw new Error(`Error fetching model configurations: ${response.status}`);
@@ -223,8 +219,6 @@ const Ask: React.FC<AskProps> = ({
         }
       } catch (err) {
         console.error('Failed to fetch model configurations:', err);
-      } finally {
-        setIsLoading(false);
       }
     };
     if(provider == '' || model == '') {
@@ -449,42 +443,34 @@ const Ask: React.FC<AskProps> = ({
       closeWebSocket(webSocketRef.current);
 
       let fullResponse = '';
+      const stream = createStreamBuffer((text) => {
+        setResponse(text);
+        if (deepResearch) {
+          const stage = extractResearchStage(text, newIteration);
+          if (stage) {
+            setResearchStages(prev => {
+              const existingStageIndex = prev.findIndex(s => s.iteration === stage.iteration && s.type === stage.type);
+              if (existingStageIndex >= 0) {
+                const newStages = [...prev];
+                newStages[existingStageIndex] = stage;
+                return newStages;
+              }
+              return [...prev, stage];
+            });
+            setCurrentStageIndex(researchStages.length);
+          }
+        }
+      });
 
-      // Create a new WebSocket connection
       webSocketRef.current = createChatWebSocket(
         requestBody,
-        // Message handler
         (message: string) => {
           fullResponse += message;
-          setResponse(fullResponse);
-
-          // Extract research stage if this is a deep research response
-          if (deepResearch) {
-            const stage = extractResearchStage(fullResponse, newIteration);
-            if (stage) {
-              // Add the stage to the research stages if it's not already there
-              setResearchStages(prev => {
-                // Check if we already have this stage
-                const existingStageIndex = prev.findIndex(s => s.iteration === stage.iteration && s.type === stage.type);
-                if (existingStageIndex >= 0) {
-                  // Update existing stage
-                  const newStages = [...prev];
-                  newStages[existingStageIndex] = stage;
-                  return newStages;
-                } else {
-                  // Add new stage
-                  return [...prev, stage];
-                }
-              });
-
-              // Update current stage index to the latest stage
-              setCurrentStageIndex(researchStages.length);
-            }
-          }
+          stream.push(fullResponse);
         },
-        // Error handler
         (error: Event) => {
           console.error('WebSocket error:', error);
+          stream.flush();
           setResponse(prev => prev + '\n\nError: WebSocket connection failed. Falling back to HTTP...');
 
           // Fallback to HTTP if WebSocket fails
@@ -493,8 +479,8 @@ const Ask: React.FC<AskProps> = ({
         },
         // Close handler
         () => {
+          stream.flush();
           if (fallbackActiveRef.current) return;
-          // Check if research is complete when the WebSocket closes
           const isComplete = checkIfResearchComplete(fullResponse);
 
           // Force completion after a maximum number of iterations (5)
@@ -551,13 +537,14 @@ const Ask: React.FC<AskProps> = ({
 
       // Read the stream
       let fullResponse = '';
+      const httpStream = createStreamBuffer((text) => setResponse(text));
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
         fullResponse += chunk;
-        setResponse(fullResponse);
+        httpStream.push(fullResponse);
 
         // Extract research stage if this is a deep research response
         if (deepResearch) {
@@ -577,6 +564,7 @@ const Ask: React.FC<AskProps> = ({
           }
         }
       }
+      httpStream.flush();
 
       if (mode === 'normal') {
         // Normal mode: append the finished answer to the conversation log.
@@ -857,36 +845,33 @@ const Ask: React.FC<AskProps> = ({
       closeWebSocket(webSocketRef.current);
 
       let fullResponse = '';
+      const stream = createStreamBuffer((text) => {
+        setResponse(text);
+        if (deepResearch) {
+          const stage = extractResearchStage(text, 1);
+          if (stage) {
+            setResearchStages([stage]);
+            setCurrentStageIndex(0);
+          }
+        }
+      });
 
-      // Create a new WebSocket connection
       webSocketRef.current = createChatWebSocket(
         requestBody,
-        // Message handler
         (message: string) => {
           fullResponse += message;
-          setResponse(fullResponse);
-
-          // Extract research stage if this is a deep research response
-          if (deepResearch) {
-            const stage = extractResearchStage(fullResponse, 1); // First iteration
-            if (stage) {
-              // Add the stage to the research stages
-              setResearchStages([stage]);
-              setCurrentStageIndex(0);
-            }
-          }
+          stream.push(fullResponse);
         },
-        // Error handler
         (error: Event) => {
           console.error('WebSocket error:', error);
+          stream.flush();
           setResponse(prev => prev + '\n\nError: WebSocket connection failed. Falling back to HTTP...');
 
-          // Fallback to HTTP if WebSocket fails
           fallbackActiveRef.current = true;
           fallbackToHttp(requestBody, askedQuestion, askedMode);
         },
-        // Close handler
         () => {
+          stream.flush();
           if (fallbackActiveRef.current) return;
           // If deep research is enabled, check if we should continue
           if (deepResearch) {
@@ -1108,7 +1093,7 @@ const Ask: React.FC<AskProps> = ({
                   ref={responseRef}
                   className="p-4 max-h-[500px] overflow-y-auto"
                 >
-                  <Markdown content={response} />
+                  <Markdown content={response} streaming={isLoading} />
                 </div>
 
                 {/* Research navigation and download */}
