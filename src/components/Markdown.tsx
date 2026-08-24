@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -227,10 +227,22 @@ const STATIC_COMPONENTS = createMarkdownComponents(false);
 const STREAMING_COMPONENTS = createMarkdownComponents(true);
 
 const Markdown: React.FC<MarkdownProps> = ({ content, streaming = false }) => {
-  const enableMath = !streaming && content.includes('$');
+  const [heavyReady, setHeavyReady] = useState(streaming);
+
+  useEffect(() => {
+    if (streaming) {
+      return;
+    }
+    setHeavyReady(false);
+    const id = window.setTimeout(() => setHeavyReady(true), 0);
+    return () => window.clearTimeout(id);
+  }, [content, streaming]);
+
+  const useHeavy = !streaming && heavyReady;
+  const enableMath = useHeavy && content.includes('$');
   const remarkPlugins = enableMath ? REMARK_PLUGINS : REMARK_PLUGINS_NO_MATH;
   const rehypePlugins = enableMath ? REHYPE_PLUGINS : REHYPE_PLUGINS_NO_MATH;
-  const components = streaming ? STREAMING_COMPONENTS : STATIC_COMPONENTS;
+  const components = useHeavy ? STATIC_COMPONENTS : STREAMING_COMPONENTS;
 
   const rendered = useMemo(
     () => (

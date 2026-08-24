@@ -11,7 +11,6 @@ from api.repository import normalize_repo_location
 from api.logger import get_logger
 from api.schemas import (
     ProcessedProjectEntry,
-    WikiCacheData,
     WikiExportRequest,
     WikiTaskSummary,
     WikiTaskRequest,
@@ -25,7 +24,9 @@ from api.services.wiki import (
     generate_repo_wiki,
     list_processed_projects,
     list_wiki_cache,
-    read_wiki_cache,
+    preview_wiki_cache,
+    read_wiki_cache_dict,
+    read_wiki_page,
     registry,
     WikiTask,
 )
@@ -139,12 +140,16 @@ async def get_local_repo_structure(
         )
 
 
-@router.get("/api/wiki_cache", response_model=Optional[WikiCacheData])
+@router.get("/api/wiki_cache")
 async def read_wiki(
     owner: str = Query(..., description="Repository owner"),
     repo: str = Query(..., description="Repository name"),
     repo_type: str = Query(..., description="Repository type (e.g., github, gitlab)"),
     language: str = Query(..., description="Language of the wiki content"),
+    content_mode: Literal["full", "preview"] = Query(
+        "full",
+        description="full = every page body; preview = structure plus the first page",
+    ),
 ):
     """Retrieve cached wiki data (structure and generated pages) for a repository."""
     supported_langs = configs["lang_config"]["supported_languages"]
@@ -152,16 +157,38 @@ async def read_wiki(
         language = configs["lang_config"]["default"]
 
     logger.info(
-        f"Attempting to retrieve wiki cache for {owner}/{repo} ({repo_type}), lang: {language}"
+        f"Attempting to retrieve wiki cache for {owner}/{repo} ({repo_type}), lang: {language}, mode: {content_mode}"
     )
-    cached_data = await read_wiki_cache(owner, repo, repo_type, language)
+    cached_data = await read_wiki_cache_dict(owner, repo, repo_type, language)
     if cached_data:
-        return cached_data
+        if content_mode == "preview":
+            cached_data = preview_wiki_cache(cached_data)
+        # Skip Pydantic response_model re-validation/serialization of megabyte caches.
+        return JSONResponse(content=cached_data)
     # Return 200 with null body if not found (frontend expects this behavior)
     logger.info(
         f"Wiki cache not found for {owner}/{repo} ({repo_type}), lang: {language}"
     )
-    return None
+    return Response(content="null", media_type="application/json")
+
+
+@router.get("/api/wiki_cache/page")
+async def read_wiki_cache_page(
+    owner: str = Query(..., description="Repository owner"),
+    repo: str = Query(..., description="Repository name"),
+    repo_type: str = Query(..., description="Repository type (e.g., github, gitlab)"),
+    language: str = Query(..., description="Language of the wiki content"),
+    page_id: str = Query(..., description="Wiki page id to load"),
+):
+    """Return a single cached wiki page body for lazy loading."""
+    supported_langs = configs["lang_config"]["supported_languages"]
+    if language not in supported_langs:
+        language = configs["lang_config"]["default"]
+
+    page = await read_wiki_page(owner, repo, repo_type, language, page_id)
+    if page is None:
+        raise HTTPException(status_code=404, detail="Wiki page not found")
+    return JSONResponse(content=page)
 
 
 @router.delete("/api/wiki_cache")

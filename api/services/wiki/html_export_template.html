@@ -399,20 +399,22 @@
         ${files ? `<div class="meta-block"><div class="nav-title">${t.files}</div>${files}</div>` : ""}
       `;
       renderNav(document.getElementById("search").value);
-      if (mermaidApi && typeof mermaidApi.render === "function") {
-        const mounts = article.querySelectorAll(".mermaid-mount");
-        for (const mount of mounts) {
-          const index = Number(mount.getAttribute("data-index"));
-          const source = preprocessMermaid(rendered.diagrams[index] || "");
-          const id = "wikimmd" + index + "x" + Math.random().toString(36).slice(2);
-          try {
-            const result = await mermaidApi.render(id, source);
-            mount.innerHTML = result.svg;
-            if (typeof result.bindFunctions === "function") result.bindFunctions(mount);
-          } catch (error) {
-            console.warn("Mermaid render failed", error);
-            mount.innerHTML = '<pre class="mermaid-fallback">' + escapeHtml(source) + "</pre>";
-          }
+      const mounts = article.querySelectorAll(".mermaid-mount");
+      for (const mount of mounts) {
+        const index = Number(mount.getAttribute("data-index"));
+        const source = preprocessMermaid(rendered.diagrams[index] || "");
+        if (!(mermaidApi && typeof mermaidApi.render === "function")) {
+          mount.innerHTML = '<pre class="mermaid-fallback">' + escapeHtml(source) + "</pre>";
+          continue;
+        }
+        const id = "wikimmd" + index + "x" + Math.random().toString(36).slice(2);
+        try {
+          const result = await mermaidApi.render(id, source);
+          mount.innerHTML = result.svg;
+          if (typeof result.bindFunctions === "function") result.bindFunctions(mount);
+        } catch (error) {
+          console.warn("Mermaid render failed", error);
+          mount.innerHTML = '<pre class="mermaid-fallback">' + escapeHtml(source) + "</pre>";
         }
       }
     }

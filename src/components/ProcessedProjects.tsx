@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { FaTimes, FaTh, FaList } from 'react-icons/fa';
 import { listWikiTasks } from '@/utils/wikiTask';
 
@@ -38,6 +39,7 @@ export default function ProcessedProjects({
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const router = useRouter();
 
   // Default messages fallback
   const defaultMessages = {
@@ -109,7 +111,7 @@ export default function ProcessedProjects({
     return maxItems ? filtered.slice(0, maxItems) : filtered;
   }, [projects, searchQuery, maxItems]);
 
-  const projectHref = (project: ProcessedProject) => {
+  const projectHref = useCallback((project: ProcessedProject) => {
     const params = new URLSearchParams({
       type: project.repo_type,
       language: project.language,
@@ -118,7 +120,16 @@ export default function ProcessedProjects({
       params.set('local_path', project.repo_url);
     }
     return `/${encodeURIComponent(project.owner)}/${encodeURIComponent(project.repo)}?${params.toString()}`;
-  };
+  }, []);
+
+  useEffect(() => {
+    filteredProjects.slice(0, 8).forEach((project) => {
+      if (project.status && project.status !== 'completed') {
+        return;
+      }
+      router.prefetch(projectHref(project));
+    });
+  }, [filteredProjects, router, projectHref]);
 
   const clearSearch = () => {
     setSearchQuery('');
@@ -231,6 +242,7 @@ export default function ProcessedProjects({
                 )}
                 <Link
                   href={projectHref(project)}
+                  prefetch
                   className="block"
                 >
                   <h3 className="text-lg font-semibold text-[var(--link-color)] hover:underline mb-2 line-clamp-2">
@@ -266,6 +278,7 @@ export default function ProcessedProjects({
                 </button>
                 <Link
                   href={projectHref(project)}
+                  prefetch
                   className="flex items-center justify-between"
                 >
                   <div className="flex-1 min-w-0">

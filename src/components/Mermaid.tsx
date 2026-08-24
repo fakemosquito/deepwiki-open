@@ -3,6 +3,16 @@ import { preprocessMermaidChart } from '@/utils/mermaid';
 
 type MermaidAPI = typeof import('mermaid').default;
 let mermaidLoader: Promise<MermaidAPI> | null = null;
+let mermaidRenderQueue: Promise<unknown> = Promise.resolve();
+
+function enqueueMermaidRender<T>(work: () => Promise<T>): Promise<T> {
+  const run = mermaidRenderQueue.then(work, work);
+  mermaidRenderQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 
 async function getMermaid(): Promise<MermaidAPI> {
   if (!mermaidLoader) {
@@ -317,8 +327,10 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
   const mermaidRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(`mermaid-${Math.random().toString(36).substring(2, 9)}`);
   const lastChartRef = useRef('');
   const isDarkModeRef = useRef(
@@ -326,6 +338,28 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
     window.matchMedia &&
     window.matchMedia('(prefers-color-scheme: dark)').matches
   );
+
+  useEffect(() => {
+    const el = hostRef.current;
+    if (!el) {
+      return;
+    }
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '160px 0px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Initialize pan-zoom functionality when SVG is rendered
   useEffect(() => {
@@ -365,46 +399,51 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
   }, [svg, zoomingEnabled]);
 
   useEffect(() => {
-    if (!chart) return;
+    if (!chart || !isVisible) return;
 
     let isMounted = true;
     const processedChart = preprocessMermaidChart(chart);
     if (lastChartRef.current === processedChart && svg) return;
 
     const renderChart = async () => {
-      if (!isMounted) return;
-
-      try {
-        setError(null);
-
-        const mermaid = await getMermaid();
-        const { svg: renderedSvg } = await mermaid.render(idRef.current, processedChart);
-
+      await enqueueMermaidRender(async () => {
         if (!isMounted) return;
 
-        let processedSvg = renderedSvg;
-        if (isDarkModeRef.current) {
-          processedSvg = processedSvg.replace('<svg ', '<svg data-theme="dark" ');
-        }
+        try {
+          setError(null);
 
-        lastChartRef.current = processedChart;
-        setSvg(processedSvg);
-      } catch (err) {
-        console.error('Mermaid rendering error:', err);
+          const mermaid = await getMermaid();
+          await new Promise((resolve) => window.setTimeout(resolve, 0));
+          if (!isMounted) return;
 
-        const errorMessage = err instanceof Error ? err.message : String(err);
+          const { svg: renderedSvg } = await mermaid.render(idRef.current, processedChart);
 
-        if (isMounted) {
-          setError(`Failed to render diagram: ${errorMessage}`);
+          if (!isMounted) return;
 
-          if (mermaidRef.current) {
-            mermaidRef.current.innerHTML = `
+          let processedSvg = renderedSvg;
+          if (isDarkModeRef.current) {
+            processedSvg = processedSvg.replace('<svg ', '<svg data-theme="dark" ');
+          }
+
+          lastChartRef.current = processedChart;
+          setSvg(processedSvg);
+        } catch (err) {
+          console.error('Mermaid rendering error:', err);
+
+          const errorMessage = err instanceof Error ? err.message : String(err);
+
+          if (isMounted) {
+            setError(`Failed to render diagram: ${errorMessage}`);
+
+            if (mermaidRef.current) {
+              mermaidRef.current.innerHTML = `
               <div class="text-red-500 dark:text-red-400 text-xs mb-1">Syntax error in diagram</div>
               <pre class="text-xs overflow-auto p-2 bg-gray-100 dark:bg-gray-800 rounded">${processedChart}</pre>
             `;
+            }
           }
         }
-      }
+      });
     };
 
     void renderChart();
@@ -412,7 +451,7 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
     return () => {
       isMounted = false;
     };
-  }, [chart]);
+  }, [chart, isVisible]);
 
   const handleDiagramClick = () => {
     if (!error && svg) {
@@ -422,7 +461,7 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
 
   if (error) {
     return (
-      <div className={`border border-[var(--highlight)]/30 rounded-md p-4 bg-[var(--highlight)]/5 ${className}`}>
+      <div ref={hostRef} className={`border border-[var(--highlight)]/30 rounded-md p-4 bg-[var(--highlight)]/5 ${className}`}>
         <div className="flex items-center mb-3">
           <div className="text-[var(--highlight)] text-xs font-medium flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -441,12 +480,14 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
 
   if (!svg) {
     return (
-      <div className={`flex justify-center items-center p-4 ${className}`}>
+      <div ref={hostRef} className={`flex justify-center items-center p-4 min-h-[12rem] ${className}`}>
         <div className="flex items-center space-x-2">
           <div className="w-2 h-2 bg-[var(--accent-primary)]/70 rounded-full animate-pulse"></div>
           <div className="w-2 h-2 bg-[var(--accent-primary)]/70 rounded-full animate-pulse delay-75"></div>
           <div className="w-2 h-2 bg-[var(--accent-primary)]/70 rounded-full animate-pulse delay-150"></div>
-          <span className="text-[var(--muted)] text-xs ml-2 font-serif">図表を描画中...</span>
+          <span className="text-[var(--muted)] text-xs ml-2 font-serif">
+            {isVisible ? '図表を描画中...' : '図表'}
+          </span>
         </div>
       </div>
     );
@@ -455,10 +496,11 @@ const Mermaid: React.FC<MermaidProps> = ({ chart, className = '', zoomingEnabled
   return (
     <>
       <div
-        ref={containerRef}
+        ref={hostRef}
         className={`w-full max-w-full ${zoomingEnabled ? "h-[600px] p-4" : ""}`}
       >
         <div
+          ref={containerRef}
           className={`relative group ${zoomingEnabled ? "h-full rounded-lg border-2 border-black" : ""}`}
         >
           <div

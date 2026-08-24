@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from api.schemas import WikiPage
 from api.services.wiki import export_wiki
-from api.services.wiki.html_export import generate_html_export
+from api.services.wiki.html_export import _inline_script, generate_html_export
 
 
 def _page(**overrides) -> WikiPage:
@@ -45,6 +45,19 @@ def test_html_export_embeds_pages_and_mermaid():
     assert "preprocessMermaid" in html
     assert "cdn.jsdelivr.net" not in html
     assert len(html) > 1_000_000
+    # mermaid.min.js uses /</g to escape HTML; a naive "</" -> "<\/" rewrite
+    # would turn that into /<\/g and the inlined script would fail to parse.
+    assert '.replace(/</g,"&lt;")' in html.replace(" ", "")
+
+
+def test_inline_script_preserves_less_than_regex_and_escapes_script_closer():
+    html = _inline_script('s.replace(/</g, "&lt;"); const x = "</script><script>alert(1)</script>";')
+    assert "/</g" in html
+    assert html.startswith("<script>")
+    assert html.strip().endswith("</script>")
+    assert "<\\/script" in html
+    # Embedded closers must not be able to terminate the wrapper script tag.
+    assert "</script><script>alert(1)</script>" not in html
 
 
 def test_html_export_escapes_script_tags_in_content():

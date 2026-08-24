@@ -1,9 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
-import CodeViewer, { CodeTarget } from '@/components/CodeViewer';
-import Markdown from '@/components/Markdown';
-import ModelSelectionModal from '@/components/ModelSelectionModal';
+import type { CodeTarget } from '@/components/CodeViewer';
 import ThemeToggle from '@/components/theme-toggle';
 import WikiTreeView from '@/components/WikiTreeView';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -22,6 +20,12 @@ import { FaBitbucket, FaBookOpen, FaComments, FaDownload, FaExclamationTriangle,
 import dynamic from 'next/dynamic';
 
 const Ask = dynamic(() => import('@/components/Ask'), { ssr: false });
+const Markdown = dynamic(() => import('@/components/Markdown'), {
+  ssr: false,
+  loading: () => <div className="h-40 animate-pulse rounded bg-[var(--background)]/50" />,
+});
+const CodeViewer = dynamic(() => import('@/components/CodeViewer'), { ssr: false });
+const ModelSelectionModal = dynamic(() => import('@/components/ModelSelectionModal'), { ssr: false });
 // Define the WikiSection and WikiStructure types directly in this file
 // since the imported types don't have the sections and rootSections properties
 interface WikiSection {
@@ -204,6 +208,7 @@ export default function RepoWikiPage() {
   const [isComprehensiveView, setIsComprehensiveView] = useState(isComprehensiveParam);
   // Create a flag to track if data was loaded from cache to prevent immediate re-save
   const cacheLoadedSuccessfully = useRef(false);
+  const requestedPageIds = useRef(new Set<string>());
 
   // Create a flag to ensure the effect only runs once
   const effectRan = React.useRef(false);
@@ -294,6 +299,7 @@ export default function RepoWikiPage() {
         repo_type: effectiveRepoInfo.type,
         language: language,
         comprehensive: isComprehensiveView.toString(),
+        content_mode: 'preview',
       });
       const response = await fetch(`/api/wiki_cache?${params.toString()}`);
 
@@ -335,9 +341,15 @@ export default function RepoWikiPage() {
         console.log('Using cached repo_url:', cachedData.repo_url);
       }
 
-      // Ensure the cached structure has sections and rootSections
+      // Ensure the cached structure has sections and rootSections.
+      // Drop page bodies from the tree — they live in generated_pages and
+      // duplicating them here doubles memory for large wikis.
       const cachedStructure = {
         ...cachedData.wiki_structure,
+        pages: (cachedData.wiki_structure.pages || []).map((page: WikiPage) => ({
+          ...page,
+          content: '',
+        })),
         sections: cachedData.wiki_structure.sections || [],
         rootSections: cachedData.wiki_structure.rootSections || []
       };
@@ -444,6 +456,7 @@ export default function RepoWikiPage() {
       setIsLoading(false);
       setEmbeddingError(false);
       setLoadingMessage(undefined);
+      requestedPageIds.current = new Set<string>();
       cacheLoadedSuccessfully.current = true;
       return true;
     } catch (error) {
@@ -451,6 +464,30 @@ export default function RepoWikiPage() {
       return false;
     }
   }, [effectiveRepoInfo, language, isComprehensiveView, messages.loading?.fetchingCache]);
+
+  const wikiCacheQuery = useCallback(() => {
+    return new URLSearchParams({
+      owner: effectiveRepoInfo.owner,
+      repo: effectiveRepoInfo.repo,
+      repo_type: effectiveRepoInfo.type,
+      language,
+    });
+  }, [effectiveRepoInfo.owner, effectiveRepoInfo.repo, effectiveRepoInfo.type, language]);
+
+  const fetchWikiPageContent = useCallback(async (pageId: string): Promise<WikiPage | null> => {
+    try {
+      const params = wikiCacheQuery();
+      params.set('page_id', pageId);
+      const response = await fetch(`/api/wiki_cache/page?${params.toString()}`);
+      if (!response.ok) {
+        return null;
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error loading wiki page from cache:', error);
+      return null;
+    }
+  }, [wikiCacheQuery]);
 
   // Map a backend task structure to the local WikiStructure shape used by the
   // progress UI (importance coercion + default sections/rootSections).
@@ -637,10 +674,25 @@ export default function RepoWikiPage() {
       setExportError(null);
       setLoadingMessage(`${language === 'ja' ? 'Wikiを' : 'Exporting wiki as '} ${format} ${language === 'ja' ? 'としてエクスポート中...' : '...'}`);
 
-      // Prepare the pages for export
+      // Prepare the pages for export. Preview mode may have empty bodies.
+      let pagesById = generatedPages;
+      const missingContent = wikiStructure.pages.some(
+        (page) => !generatedPages[page.id]?.content || generatedPages[page.id].content === 'Content not generated'
+      );
+      if (missingContent) {
+        const params = wikiCacheQuery();
+        params.set('content_mode', 'full');
+        const fullResponse = await fetch(`/api/wiki_cache?${params.toString()}`);
+        if (fullResponse.ok) {
+          const fullCache = await fullResponse.json();
+          if (fullCache?.generated_pages) {
+            pagesById = fullCache.generated_pages;
+          }
+        }
+      }
+
       const pagesToExport = wikiStructure.pages.map(page => {
-        // Use the generated content if available, otherwise use an empty string
-        const content = generatedPages[page.id]?.content || 'Content not generated';
+        const content = pagesById[page.id]?.content || 'Content not generated';
         return {
           ...page,
           content
@@ -700,7 +752,7 @@ export default function RepoWikiPage() {
       setIsExporting(false);
       setLoadingMessage(undefined);
     }
-  }, [wikiStructure, generatedPages, effectiveRepoInfo, language]);
+  }, [wikiStructure, generatedPages, effectiveRepoInfo, language, wikiCacheQuery]);
 
   // No longer needed as we use the modal directly
 
@@ -821,6 +873,40 @@ export default function RepoWikiPage() {
     // Clean up function for this effect is not strictly necessary for loadData,
     // but keeping the main unmount cleanup in the other useEffect
   }, [effectiveRepoInfo.owner, effectiveRepoInfo.repo, effectiveRepoInfo.type, language, isComprehensiveView, loadWikiFromServerCache, startGeneration]);
+
+  // Preview responses omit page bodies except the first page. Fetch the rest
+  // only when the user actually opens them so React never hydrates the whole wiki.
+  useEffect(() => {
+    if (!currentPageId || !cacheLoadedSuccessfully.current) {
+      return;
+    }
+    const page = generatedPages[currentPageId];
+    if (!page || page.content) {
+      return;
+    }
+    if (requestedPageIds.current.has(currentPageId)) {
+      return;
+    }
+    requestedPageIds.current.add(currentPageId);
+    let cancelled = false;
+    fetchWikiPageContent(currentPageId).then((fullPage) => {
+      if (cancelled) {
+        return;
+      }
+      if (!fullPage) {
+        requestedPageIds.current.delete(currentPageId);
+        return;
+      }
+      setGeneratedPages((prev) => ({
+        ...prev,
+        [currentPageId]: { ...prev[currentPageId], ...fullPage },
+      }));
+    });
+    return () => {
+      cancelled = true;
+      requestedPageIds.current.delete(currentPageId);
+    };
+  }, [currentPageId, generatedPages, fetchWikiPageContent]);
 
   // Save wiki to server-side cache when generation is complete
   useEffect(() => {
@@ -1123,9 +1209,13 @@ export default function RepoWikiPage() {
 
 
                   <div className="prose prose-sm md:prose-base lg:prose-lg max-w-none">
-                    <Markdown
-                      content={generatedPages[currentPageId].content}
-                    />
+                    {generatedPages[currentPageId].content ? (
+                      <Markdown
+                        content={generatedPages[currentPageId].content}
+                      />
+                    ) : (
+                      <div className="h-40 animate-pulse rounded bg-[var(--background)]/50" />
+                    )}
                   </div>
 
                   {generatedPages[currentPageId].relatedPages.length > 0 && (

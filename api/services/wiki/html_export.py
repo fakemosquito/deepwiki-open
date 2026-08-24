@@ -7,6 +7,7 @@ from local vendor / node_modules copies so the page works without a network.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -20,6 +21,9 @@ _TEMPLATE_PATH = _HERE / "html_export_template.html"
 _VENDOR_DIR = _HERE / "vendor"
 _PLACEHOLDER_DATA = "__WIKI_DATA__"
 _PLACEHOLDER_SCRIPTS = "__VENDOR_SCRIPTS__"
+# HTML parsers close a classic <script> at "</script" (any case). Escape only
+# that sequence — replacing every "</" would break JS regexes such as /</g.
+_SCRIPT_CLOSE_RE = re.compile(r"</script", re.IGNORECASE)
 
 
 def _walk_node_modules(*parts: str) -> Path | None:
@@ -38,7 +42,7 @@ def _resolve_js(vendor_name: str, *node_modules_parts: str) -> Path | None:
 
 
 def _inline_script(js: str) -> str:
-    safe = js.replace("</", "<\\/")
+    safe = _SCRIPT_CLOSE_RE.sub("<\\/script", js)
     return "<script>" + safe + "</script>\n"
 
 
