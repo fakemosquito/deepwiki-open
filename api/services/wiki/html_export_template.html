@@ -182,6 +182,236 @@
       .main { padding: 16px; }
       .article { padding: 18px; }
     }
+    .ask-fab {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 40;
+      width: 56px;
+      height: 56px;
+      border: 0;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      line-height: 1;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    .ask-fab:hover { transform: scale(1.05); opacity: 0.95; }
+    .ask-fab svg { width: 24px; height: 24px; fill: currentColor; }
+    .ask-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      z-index: 50;
+      width: min(420px, 100vw);
+      height: 100vh;
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(110%);
+      transition: transform 0.22s ease;
+    }
+    .ask-drawer.open { transform: translateX(0); }
+    .ask-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .ask-header h2 {
+      margin: 0;
+      flex: 1;
+      font-size: 16px;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+    .ask-icon-btn {
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--fg);
+      border-radius: 8px;
+      width: 34px;
+      height: 34px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    .ask-icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
+    .ask-messages {
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .ask-msg {
+      max-width: 92%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      line-height: 1.55;
+      font-size: 14px;
+      word-break: break-word;
+    }
+    .ask-msg-user {
+      align-self: flex-end;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+    .ask-msg-assistant {
+      align-self: flex-start;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+    }
+    .ask-msg-assistant .prose { font-size: 14px; }
+    .ask-msg-assistant .prose pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      overflow: auto;
+      font-size: 12px;
+    }
+    .ask-msg-assistant .prose code {
+      background: var(--code-bg);
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-size: 0.9em;
+    }
+    .ask-msg-assistant .prose p { margin: 0.4em 0; }
+    .ask-hint {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+      padding: 24px 12px;
+      line-height: 1.6;
+    }
+    .ask-error {
+      display: none;
+      margin: 0 16px 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(180, 40, 40, 0.1);
+      border: 1px solid rgba(180, 40, 40, 0.35);
+      color: #b42828;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .ask-error.show { display: block; }
+    .ask-input {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .ask-input textarea {
+      flex: 1;
+      min-height: 44px;
+      max-height: 140px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--fg);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      font-size: 14px;
+    }
+    .ask-input button {
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 10px;
+      padding: 0 16px;
+      cursor: pointer;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .ask-input button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .ask-settings-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(0, 0, 0, 0.45);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .ask-settings-overlay.open { display: flex; }
+    .ask-settings {
+      width: min(420px, 100%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+    .ask-settings h3 {
+      margin: 0 0 14px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 18px;
+    }
+    .ask-field { margin-bottom: 12px; }
+    .ask-field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .ask-field input, .ask-field select {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--fg);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+      font-size: 14px;
+    }
+    .ask-settings-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      justify-content: flex-end;
+    }
+    .ask-settings-actions button {
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--fg);
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .ask-settings-actions button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+    }
+    .ask-settings-note {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -436,6 +666,470 @@
     window.addEventListener("hashchange", renderPage);
     if (!location.hash && pages[0]) location.hash = pages[0].id;
     else renderPage();
+  </script>
+
+  <button class="ask-fab" id="ask-fab" type="button" aria-label="Ask AI" title="Ask AI">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.5V20a1 1 0 0 0 1.6.8L14 19h2a4 4 0 0 0 4-4v-5a8 8 0 0 0-8-8zm-1 5h2v2h-2V7zm0 4h2v5h-2v-5z"/></svg>
+  </button>
+
+  <aside class="ask-drawer" id="ask-drawer" aria-hidden="true">
+    <div class="ask-header">
+      <h2 id="ask-title">Ask AI</h2>
+      <button class="ask-icon-btn" id="ask-settings-btn" type="button" title="Settings" aria-label="Settings">⚙</button>
+      <button class="ask-icon-btn" id="ask-clear-btn" type="button" title="Clear" aria-label="Clear conversation">🗑</button>
+      <button class="ask-icon-btn" id="ask-close-btn" type="button" title="Close" aria-label="Close">✕</button>
+    </div>
+    <div class="ask-error" id="ask-error"></div>
+    <div class="ask-messages" id="ask-messages">
+      <div class="ask-hint" id="ask-hint"></div>
+    </div>
+    <div class="ask-input">
+      <textarea id="ask-textarea" rows="2" placeholder="Ask about this wiki..."></textarea>
+      <button type="button" id="ask-send">Send</button>
+    </div>
+  </aside>
+
+  <div class="ask-settings-overlay" id="ask-settings-overlay">
+    <div class="ask-settings" role="dialog" aria-labelledby="ask-settings-title">
+      <h3 id="ask-settings-title">AI Settings</h3>
+      <div class="ask-field">
+        <label for="ask-base-url">Base URL</label>
+        <input id="ask-base-url" type="url" placeholder="https://api.openai.com/v1" autocomplete="off" />
+      </div>
+      <div class="ask-field">
+        <label for="ask-api-key">API Key</label>
+        <input id="ask-api-key" type="password" placeholder="sk-..." autocomplete="off" />
+      </div>
+      <div class="ask-field">
+        <label for="ask-model">Model</label>
+        <input id="ask-model" type="text" placeholder="gpt-4o-mini" autocomplete="off" />
+      </div>
+      <div class="ask-field">
+        <label for="ask-ctx-mode">Context</label>
+        <select id="ask-ctx-mode">
+          <option value="current">Current page</option>
+          <option value="all">All pages</option>
+        </select>
+      </div>
+      <div class="ask-settings-actions">
+        <button type="button" id="ask-test-btn">Test</button>
+        <button type="button" id="ask-cancel-settings">Cancel</button>
+        <button type="button" class="primary" id="ask-save-settings">Save</button>
+      </div>
+      <p class="ask-settings-note" id="ask-settings-note"></p>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const CFG_KEY = "deepwiki_ask_cfg";
+      const MAX_CONTEXT_CHARS = 120000;
+      const askIsZh = typeof isZh !== "undefined" ? isZh : /[\u4e00-\u9fff]/.test((pages || []).map((p) => p.title || "").join(""));
+      const at = askIsZh
+        ? {
+            title: "问 AI",
+            hint: "基于本 Wiki 内容提问。首次使用请先配置与软件相同的 OpenAI 兼容接口。",
+            placeholder: "问问这个仓库…",
+            send: "发送",
+            settings: "AI 设置",
+            baseUrl: "Base URL",
+            apiKey: "API Key",
+            model: "模型",
+            context: "上下文范围",
+            ctxCurrent: "当前页面",
+            ctxAll: "全部页面",
+            test: "测试连接",
+            cancel: "取消",
+            save: "保存",
+            note: "配置仅保存在本机浏览器 localStorage，不会写入 HTML 文件。接口需允许浏览器跨域（CORS）。",
+            needCfg: "请先配置 Base URL、API Key 和模型。",
+            saved: "已保存。",
+            testOk: "连接成功。",
+            testFail: "连接失败：",
+            corsHint: "无法连接。请检查 Base URL，或确认接口已允许浏览器跨域（CORS）。",
+            streaming: "生成中…",
+            empty: "请输入问题。",
+            truncated: "（上下文过长，已截断）",
+            clearConfirm: "清空当前对话？",
+          }
+        : {
+            title: "Ask AI",
+            hint: "Ask questions about this wiki. Configure the same OpenAI-compatible API used by the app.",
+            placeholder: "Ask about this repository…",
+            send: "Send",
+            settings: "AI Settings",
+            baseUrl: "Base URL",
+            apiKey: "API Key",
+            model: "Model",
+            context: "Context",
+            ctxCurrent: "Current page",
+            ctxAll: "All pages",
+            test: "Test",
+            cancel: "Cancel",
+            save: "Save",
+            note: "Settings are stored in this browser's localStorage only. The API must allow browser CORS.",
+            needCfg: "Please configure Base URL, API Key, and Model first.",
+            saved: "Saved.",
+            testOk: "Connection OK.",
+            testFail: "Connection failed: ",
+            corsHint: "Cannot reach the API. Check Base URL or CORS settings on the server.",
+            streaming: "Generating…",
+            empty: "Please enter a question.",
+            truncated: "(context truncated due to length)",
+            clearConfirm: "Clear the conversation?",
+          };
+
+      const fab = document.getElementById("ask-fab");
+      const drawer = document.getElementById("ask-drawer");
+      const messagesEl = document.getElementById("ask-messages");
+      const hintEl = document.getElementById("ask-hint");
+      const errorEl = document.getElementById("ask-error");
+      const textarea = document.getElementById("ask-textarea");
+      const sendBtn = document.getElementById("ask-send");
+      const overlay = document.getElementById("ask-settings-overlay");
+      const baseUrlInput = document.getElementById("ask-base-url");
+      const apiKeyInput = document.getElementById("ask-api-key");
+      const modelInput = document.getElementById("ask-model");
+      const ctxModeSelect = document.getElementById("ask-ctx-mode");
+
+      document.getElementById("ask-title").textContent = at.title;
+      document.getElementById("ask-settings-title").textContent = at.settings;
+      document.querySelector('label[for="ask-base-url"]').textContent = at.baseUrl;
+      document.querySelector('label[for="ask-api-key"]').textContent = at.apiKey;
+      document.querySelector('label[for="ask-model"]').textContent = at.model;
+      document.querySelector('label[for="ask-ctx-mode"]').textContent = at.context;
+      ctxModeSelect.options[0].textContent = at.ctxCurrent;
+      ctxModeSelect.options[1].textContent = at.ctxAll;
+      document.getElementById("ask-test-btn").textContent = at.test;
+      document.getElementById("ask-cancel-settings").textContent = at.cancel;
+      document.getElementById("ask-save-settings").textContent = at.save;
+      document.getElementById("ask-settings-note").textContent = at.note;
+      textarea.placeholder = at.placeholder;
+      sendBtn.textContent = at.send;
+      hintEl.textContent = at.hint;
+
+      let conversation = [];
+      let streaming = false;
+      let abortController = null;
+
+      function loadCfg() {
+        try {
+          const raw = localStorage.getItem(CFG_KEY);
+          if (!raw) return { baseUrl: "", apiKey: "", model: "", ctxMode: "current" };
+          const parsed = JSON.parse(raw);
+          return {
+            baseUrl: String(parsed.baseUrl || "").trim(),
+            apiKey: String(parsed.apiKey || "").trim(),
+            model: String(parsed.model || "").trim(),
+            ctxMode: parsed.ctxMode === "all" ? "all" : "current",
+          };
+        } catch (_) {
+          return { baseUrl: "", apiKey: "", model: "", ctxMode: "current" };
+        }
+      }
+
+      function saveCfg(cfg) {
+        localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+      }
+
+      function hasCfg(cfg) {
+        return !!(cfg.baseUrl && cfg.apiKey && cfg.model);
+      }
+
+      function normalizeBaseUrl(url) {
+        let u = String(url || "").trim().replace(/\/+$/, "");
+        if (u.endsWith("/chat/completions")) u = u.slice(0, -"/chat/completions".length);
+        return u.replace(/\/+$/, "");
+      }
+
+      function showError(msg) {
+        if (!msg) {
+          errorEl.classList.remove("show");
+          errorEl.textContent = "";
+          return;
+        }
+        errorEl.textContent = msg;
+        errorEl.classList.add("show");
+      }
+
+      function openDrawer() {
+        drawer.classList.add("open");
+        drawer.setAttribute("aria-hidden", "false");
+        const cfg = loadCfg();
+        if (!hasCfg(cfg)) openSettings();
+        textarea.focus();
+      }
+
+      function closeDrawer() {
+        drawer.classList.remove("open");
+        drawer.setAttribute("aria-hidden", "true");
+      }
+
+      function openSettings() {
+        const cfg = loadCfg();
+        baseUrlInput.value = cfg.baseUrl;
+        apiKeyInput.value = cfg.apiKey;
+        modelInput.value = cfg.model;
+        ctxModeSelect.value = cfg.ctxMode;
+        overlay.classList.add("open");
+      }
+
+      function closeSettings() {
+        overlay.classList.remove("open");
+      }
+
+      function renderAssistantHtml(text) {
+        if (typeof parseMarkdown === "function") return parseMarkdown(text);
+        return escapeHtml(text).replace(/\n/g, "<br>");
+      }
+
+      function appendMessage(role, content, isStreaming) {
+        if (hintEl && hintEl.parentNode === messagesEl) hintEl.remove();
+        const div = document.createElement("div");
+        div.className = "ask-msg ask-msg-" + role + (role === "assistant" ? " prose" : "");
+        if (role === "assistant") {
+          div.innerHTML = renderAssistantHtml(content || (isStreaming ? "…" : ""));
+        } else {
+          div.textContent = content;
+        }
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return div;
+      }
+
+      function updateAssistantBubble(el, content) {
+        el.innerHTML = renderAssistantHtml(content || "…");
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function buildContext(cfg) {
+        const repo = (data.metadata && data.metadata.repository) || "";
+        let body = "";
+        let truncated = false;
+        if (cfg.ctxMode === "all") {
+          const parts = (pages || []).map((p) => {
+            return "## " + (p.title || p.id) + "\n\n" + (p.content || "");
+          });
+          body = parts.join("\n\n---\n\n");
+        } else {
+          const page = byId[currentId()] || (pages && pages[0]);
+          if (page) {
+            body = "## " + (page.title || page.id) + "\n\n" + (page.content || "");
+          }
+        }
+        if (body.length > MAX_CONTEXT_CHARS) {
+          body = body.slice(0, MAX_CONTEXT_CHARS) + "\n\n" + at.truncated;
+          truncated = true;
+        }
+        const system =
+          "You are a helpful assistant answering questions about a software repository wiki.\n" +
+          "Repository: " + repo + "\n" +
+          "Answer based only on the wiki context below. If the answer is not in the context, say so.\n" +
+          "Respond in the same language the user uses.\n\n" +
+          "=== Wiki context ===\n" +
+          body;
+        return { system, truncated };
+      }
+
+      async function readSseStream(response, onDelta) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let full = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith(":")) continue;
+            if (!trimmed.startsWith("data:")) continue;
+            const payload = trimmed.slice(5).trim();
+            if (payload === "[DONE]") continue;
+            try {
+              const json = JSON.parse(payload);
+              const delta =
+                (json.choices && json.choices[0] && json.choices[0].delta && json.choices[0].delta.content) ||
+                (json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) ||
+                "";
+              if (delta) {
+                full += delta;
+                onDelta(full);
+              }
+            } catch (_) {
+              /* ignore partial JSON */
+            }
+          }
+        }
+        return full;
+      }
+
+      async function testConnection() {
+        const baseUrl = normalizeBaseUrl(baseUrlInput.value);
+        const apiKey = apiKeyInput.value.trim();
+        const model = modelInput.value.trim();
+        if (!baseUrl || !apiKey || !model) {
+          showError(at.needCfg);
+          return;
+        }
+        showError("");
+        document.getElementById("ask-test-btn").disabled = true;
+        try {
+          const res = await fetch(baseUrl + "/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + apiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: [{ role: "user", content: "ping" }],
+              max_tokens: 8,
+              stream: false,
+            }),
+          });
+          if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            showError(at.testFail + res.status + (text ? " — " + text.slice(0, 200) : ""));
+            return;
+          }
+          showError("");
+          document.getElementById("ask-settings-note").textContent = at.testOk + " " + at.note;
+        } catch (err) {
+          const msg = String(err && err.message || err);
+          showError(/Failed to fetch|NetworkError|CORS/i.test(msg) ? at.corsHint : at.testFail + msg);
+        } finally {
+          document.getElementById("ask-test-btn").disabled = false;
+        }
+      }
+
+      async function sendAsk() {
+        if (streaming) return;
+        const question = textarea.value.trim();
+        if (!question) {
+          showError(at.empty);
+          return;
+        }
+        const cfg = loadCfg();
+        if (!hasCfg(cfg)) {
+          openSettings();
+          showError(at.needCfg);
+          return;
+        }
+        showError("");
+        textarea.value = "";
+        appendMessage("user", question);
+        conversation.push({ role: "user", content: question });
+
+        const { system } = buildContext(cfg);
+        const payloadMessages = [
+          { role: "system", content: system },
+          ...conversation.map((m) => ({ role: m.role, content: m.content })),
+        ];
+
+        const bubble = appendMessage("assistant", "…", true);
+        streaming = true;
+        sendBtn.disabled = true;
+        sendBtn.textContent = at.streaming;
+        abortController = new AbortController();
+
+        try {
+          const baseUrl = normalizeBaseUrl(cfg.baseUrl);
+          const res = await fetch(baseUrl + "/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + cfg.apiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: cfg.model,
+              messages: payloadMessages,
+              stream: true,
+            }),
+            signal: abortController.signal,
+          });
+          if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            throw new Error(res.status + (text ? " — " + text.slice(0, 300) : ""));
+          }
+          const full = await readSseStream(res, (partial) => updateAssistantBubble(bubble, partial));
+          if (!full) {
+            updateAssistantBubble(bubble, "(empty response)");
+            conversation.push({ role: "assistant", content: "(empty response)" });
+          } else {
+            updateAssistantBubble(bubble, full);
+            conversation.push({ role: "assistant", content: full });
+          }
+        } catch (err) {
+          if (err && err.name === "AbortError") return;
+          const msg = String(err && err.message || err);
+          const friendly = /Failed to fetch|NetworkError|CORS/i.test(msg) ? at.corsHint : msg;
+          showError(friendly);
+          updateAssistantBubble(bubble, "⚠ " + friendly);
+          conversation.pop();
+        } finally {
+          streaming = false;
+          sendBtn.disabled = false;
+          sendBtn.textContent = at.send;
+          abortController = null;
+        }
+      }
+
+      function clearConversation() {
+        if (conversation.length && !confirm(at.clearConfirm)) return;
+        conversation = [];
+        messagesEl.innerHTML = "";
+        const hint = document.createElement("div");
+        hint.className = "ask-hint";
+        hint.id = "ask-hint";
+        hint.textContent = at.hint;
+        messagesEl.appendChild(hint);
+        showError("");
+      }
+
+      fab.addEventListener("click", () => {
+        if (drawer.classList.contains("open")) closeDrawer();
+        else openDrawer();
+      });
+      document.getElementById("ask-close-btn").addEventListener("click", closeDrawer);
+      document.getElementById("ask-settings-btn").addEventListener("click", openSettings);
+      document.getElementById("ask-clear-btn").addEventListener("click", clearConversation);
+      document.getElementById("ask-cancel-settings").addEventListener("click", closeSettings);
+      document.getElementById("ask-save-settings").addEventListener("click", () => {
+        const cfg = {
+          baseUrl: normalizeBaseUrl(baseUrlInput.value),
+          apiKey: apiKeyInput.value.trim(),
+          model: modelInput.value.trim(),
+          ctxMode: ctxModeSelect.value === "all" ? "all" : "current",
+        };
+        if (!hasCfg(cfg)) {
+          showError(at.needCfg);
+          return;
+        }
+        saveCfg(cfg);
+        closeSettings();
+        showError("");
+        document.getElementById("ask-settings-note").textContent = at.note;
+      });
+      document.getElementById("ask-test-btn").addEventListener("click", testConnection);
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) closeSettings();
+      });
+      sendBtn.addEventListener("click", sendAsk);
+      textarea.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendAsk();
+        }
+      });
+      window.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        if (overlay.classList.contains("open")) closeSettings();
+        else if (drawer.classList.contains("open")) closeDrawer();
+      });
+    })();
   </script>
 </body>
 </html>

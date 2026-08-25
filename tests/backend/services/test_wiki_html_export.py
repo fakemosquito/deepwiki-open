@@ -101,3 +101,18 @@ def test_export_wiki_html_endpoint_downloads_file():
     assert "fakereel_player_wiki_" in response.headers["content-disposition"]
     assert response.headers["content-disposition"].endswith(".html")
     assert response.text.strip().startswith("<!DOCTYPE html>")
+
+
+def test_html_export_includes_ask_ai_panel():
+    html = generate_html_export(
+        "https://github.com/acme/demo",
+        [_page()],
+        timestamp=datetime(2026, 8, 24, 12, 0, 0),
+    )
+
+    assert 'class="ask-fab"' in html
+    assert 'class="ask-drawer"' in html
+    assert 'class="ask-settings"' in html
+    assert "chat/completions" in html
+    assert "localStorage" in html
+    assert "deepwiki_ask_cfg" in html
