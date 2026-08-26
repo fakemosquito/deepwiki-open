@@ -607,4 +607,11 @@ def get_embedder(
     # Set batch_size as an attribute if available (not a constructor parameter)
     if "batch_size" in embedder_config:
         embedder.batch_size = embedder_config["batch_size"]
+    logger.info(
+        "Created embedder type=%s client=%s model=%s cache=%s",
+        resolved_type,
+        getattr(model_client_class, "__name__", model_client_class),
+        (embedder_config.get("model_kwargs") or {}).get("model"),
+        os.environ.get("FASTEMBED_CACHE_PATH", ""),
+    )
     return embedder

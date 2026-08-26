@@ -51,6 +51,41 @@ function getUserDataPaths() {
   };
 }
 
+function getBundledFastembedCache() {
+  return path.join(getRuntimeRoot(), 'fastembed_cache');
+}
+
+function getFastembedCachePath() {
+  if (!app.isPackaged) {
+    return getBundledFastembedCache();
+  }
+  return path.join(app.getPath('userData'), 'models', 'fastembed_cache');
+}
+
+function syncFastembedCache() {
+  const dest = getFastembedCachePath();
+  const bundled = getBundledFastembedCache();
+  if (!app.isPackaged) {
+    return fs.existsSync(bundled) ? bundled : dest;
+  }
+  fs.mkdirSync(dest, { recursive: true });
+  const modelDir = 'qdrant--bge-small-en-v1.5-onnx-q';
+  const destOnnx = path.join(dest, modelDir, 'model_optimized.onnx');
+  const srcOnnx = path.join(bundled, modelDir, 'model_optimized.onnx');
+  try {
+    const destOk = fs.existsSync(destOnnx) && fs.statSync(destOnnx).size > 1000;
+    if (!destOk && fs.existsSync(srcOnnx) && fs.statSync(srcOnnx).size > 1000) {
+      fs.cpSync(bundled, dest, { recursive: true });
+    }
+    if (fs.existsSync(destOnnx) && fs.statSync(destOnnx).size > 1000) {
+      return dest;
+    }
+  } catch {
+    // Fall back to the bundled cache if the user-data copy fails.
+  }
+  return fs.existsSync(bundled) ? bundled : dest;
+}
+
 function ensureUserData() {
   const paths = getUserDataPaths();
   fs.mkdirSync(paths.dataDir, { recursive: true });
@@ -171,6 +206,7 @@ function writeDesktopModelConfig(keys) {
 
   const model = String(keys.OPENAI_MODEL || '').trim() || 'gpt-4o';
   const embeddingModel = resolveLocalEmbeddingModel(keys.OPENAI_EMBEDDING_MODEL);
+  const cacheDir = getFastembedCachePath();
 
   const generator = {
     default_provider: 'openai',
@@ -203,12 +239,17 @@ function writeDesktopModelConfig(keys) {
       },
       batch_size: 10,
       model_kwargs: {
-        model: embeddingModel,
+        model: 'text-embedding-3-small',
       },
     },
     embedder_local: {
       client_class: 'LocalEmbedderClient',
       batch_size: 32,
+      initialize_kwargs: {
+        model: embeddingModel,
+        cache_dir: cacheDir,
+        local_files_only: true,
+      },
       model_kwargs: {
         model: embeddingModel,
       },
@@ -304,4 +345,7 @@ module.exports = {
   hasAnyApiKey: hasModelConnection,
   DEFAULT_LOCAL_EMBEDDING_MODEL,
   resolveLocalEmbeddingModel,
+  getBundledFastembedCache,
+  getFastembedCachePath,
+  syncFastembedCache,
 };

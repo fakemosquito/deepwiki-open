@@ -104,7 +104,12 @@ if __name__ == "__main__":
     # Get port from environment variable or use default
     port = int(os.environ.get("PORT", 8001))
 
-    logger.info(f"Starting Streaming API on port {port}")
+    logger.info(
+        "Starting Streaming API on port %s embedder=%s fastembed_cache=%s",
+        port,
+        os.environ.get("DEEPWIKI_EMBEDDER_TYPE", "openai"),
+        os.environ.get("FASTEMBED_CACHE_PATH", ""),
+    )
 
     # Run the FastAPI app with uvicorn
     uvicorn.run(

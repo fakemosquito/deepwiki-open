@@ -98,6 +98,52 @@ def _embedder_output_has_vectors(output) -> bool:
     return False
 
 
+class _RaisingEmbedder:
+    """Raise instead of returning empty EmbedderOutput so ToEmbeddings cannot skip failures."""
+
+    def __init__(self, inner):
+        object.__setattr__(self, "_inner", inner)
+        batch_size = getattr(inner, "batch_size", None)
+        if batch_size is not None:
+            object.__setattr__(self, "batch_size", batch_size)
+
+    def _checked(self, output, exc: Exception | None = None):
+        if exc is not None:
+            if isinstance(exc, EmbeddingFailedError):
+                raise exc
+            raise EmbeddingFailedError(
+                f"Embedding failed: {_summarize_embedder_failure(exc=exc)}. "
+                f"{EMBEDDING_FAILURE_HINT}"
+            ) from exc
+        if not _embedder_output_has_vectors(output):
+            raise EmbeddingFailedError(
+                f"Embedding failed: {_summarize_embedder_failure(output)}. "
+                f"{EMBEDDING_FAILURE_HINT}"
+            )
+        return output
+
+    def call(self, input, model_kwargs=None):
+        if model_kwargs is None:
+            model_kwargs = {}
+        try:
+            output = self._inner.call(input=input, model_kwargs=model_kwargs)
+        except Exception as e:
+            return self._checked(None, exc=e)
+        return self._checked(output)
+
+    def __call__(self, *args, **kwargs):
+        try:
+            output = self._inner(*args, **kwargs)
+        except TypeError:
+            return self.call(*args, **kwargs)
+        except Exception as e:
+            return self._checked(None, exc=e)
+        return self._checked(output)
+
+    def __getattr__(self, name):
+        return getattr(object.__getattribute__(self, "_inner"), name)
+
+
 def assert_embedder_ready(embedder) -> None:
     """Fail fast if the configured embedder cannot produce a single vector."""
     try:
@@ -330,7 +376,7 @@ def prepare_data_pipeline(embedder_type: str = None, is_ollama_embedder: bool = 
     splitter = LineTrackingTextSplitter(**configs["text_splitter"])
     embedder_config = get_embedder_config()
 
-    embedder = get_embedder(embedder_type=embedder_type)
+    embedder = _RaisingEmbedder(get_embedder(embedder_type=embedder_type))
 
     batch_size = embedder_config.get("batch_size", 500)
     embedder_transformer = ToEmbeddings(embedder=embedder, batch_size=batch_size)
@@ -564,6 +610,16 @@ class DatabaseManager:
             included_dirs=included_dirs,
             included_files=included_files,
         )
+        logger.info(
+            "Read %s source documents from %s",
+            len(documents),
+            self.repo_paths["save_repo_dir"],
+        )
+        if not documents:
+            raise ValueError(
+                "No source files were found to index in this repository "
+                "(0 documents after filters). Check the folder path and include/exclude filters."
+            )
         self.db = transform_documents_and_save_to_db(
             documents, self.repo_paths["save_db_file"], embedder_type=embedder_type
         )
@@ -585,9 +641,17 @@ class DatabaseManager:
                 logger.warning(
                     "Failed to remove empty embedding database %s: %s", db_path, e
                 )
+            detail = "the embedder returned no vectors"
+            try:
+                probe = get_embedder(embedder_type=embedder_type)(
+                    "deepwiki embedding diagnose"
+                )
+                detail = _summarize_embedder_failure(probe)
+            except Exception as e:
+                detail = _summarize_embedder_failure(exc=e)
             raise EmbeddingFailedError(
                 "No valid documents with embeddings found. Cannot create retriever. "
-                f"{EMBEDDING_FAILURE_HINT}"
+                f"Diagnostic: {detail}. {EMBEDDING_FAILURE_HINT}"
             )
         return transformed_docs
 

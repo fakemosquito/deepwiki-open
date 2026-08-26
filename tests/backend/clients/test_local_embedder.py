@@ -80,6 +80,46 @@ def test_local_embedder_rejects_non_embedder_type():
         client.convert_inputs_to_api_kwargs("x", {}, ModelType.LLM)
 
 
+def test_local_embedder_uses_single_thread(monkeypatch):
+    class CapturingModel:
+        def __init__(self):
+            self.kwargs = None
+
+        def embed(self, texts, **kwargs):
+            self.kwargs = kwargs
+            return [[0.1, 0.2, 0.3] for _ in texts]
+
+    client = LocalEmbedderClient(model=DEFAULT_MODEL, cache_dir="C:\\cache")
+    monkeypatch.setattr(client, "_ensure_model", lambda name: None)
+    client._model = CapturingModel()
+    kwargs = client.convert_inputs_to_api_kwargs(
+        ["a", "b"], {"model": DEFAULT_MODEL}, ModelType.EMBEDDER
+    )
+    raw = client.call(kwargs, ModelType.EMBEDDER)
+    assert client._model.kwargs.get("parallel") == 1
+    assert len(raw["embeddings"]) == 2
+
+
+def test_local_embedder_raises_on_empty_vectors(monkeypatch):
+    class EmptyModel:
+        def embed(self, texts, **kwargs):
+            return []
+
+    client = LocalEmbedderClient(model=DEFAULT_MODEL, cache_dir="C:\\cache")
+    monkeypatch.setattr(client, "_ensure_model", lambda name: None)
+    client._model = EmptyModel()
+    kwargs = client.convert_inputs_to_api_kwargs(
+        "hello", {"model": DEFAULT_MODEL}, ModelType.EMBEDDER
+    )
+    with pytest.raises(RuntimeError, match="produced no vectors"):
+        client.call(kwargs, ModelType.EMBEDDER)
+
+
+def test_local_embedder_accepts_model_name_alias():
+    client = LocalEmbedderClient(model_name=DEFAULT_MODEL, local_files_only=True)
+    assert client._model_name == DEFAULT_MODEL
+
+
 def test_local_embedder_pickle_drops_onnx_session():
     import pickle
 

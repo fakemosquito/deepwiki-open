@@ -41,17 +41,26 @@ class LocalEmbedderClient(ModelClient):
     def __init__(
         self,
         model: Optional[str] = None,
+        model_name: Optional[str] = None,
         cache_dir: Optional[str] = None,
+        local_files_only: bool = True,
         **kwargs,
     ):
         super().__init__()
-        self._model_name = (model or "").strip() or DEFAULT_MODEL
+        self._model_name = (model or model_name or "").strip() or DEFAULT_MODEL
         self._cache_dir = (
             cache_dir or os.environ.get("FASTEMBED_CACHE_PATH") or ""
         ).strip() or None
+        self._local_files_only = bool(local_files_only)
         self._model = None
         self._loaded_name = None
         self._infer_lock = threading.Lock()
+        log.info(
+            "LocalEmbedderClient model=%s cache_dir=%s local_files_only=%s",
+            self._model_name,
+            self._cache_dir or "(default ~/.cache/fastembed)",
+            self._local_files_only,
+        )
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -89,7 +98,11 @@ class LocalEmbedderClient(ModelClient):
             return
         self._model = _load_text_embedding(name, self._cache_dir)
         self._loaded_name = name
-        log.info("Loaded local embedding model %s", name)
+        log.info(
+            "Loaded local embedding model %s from cache_dir=%s",
+            name,
+            self._cache_dir or "(default)",
+        )
 
     def convert_inputs_to_api_kwargs(
         self,
@@ -128,13 +141,28 @@ class LocalEmbedderClient(ModelClient):
         model_name = api_kwargs.get("model") or self._model_name
         self._ensure_model(model_name)
         with self._infer_lock:
-            raw = list(self._model.embed(list(texts), parallel=None))
+            # parallel=1 avoids ONNX/FastEmbed empty-output races on Windows.
+            raw = list(self._model.embed(list(texts), parallel=1))
         vectors = []
         for item in raw:
+            if item is None:
+                continue
             if hasattr(item, "tolist"):
-                vectors.append(item.tolist())
+                vector = item.tolist()
             else:
-                vectors.append(list(item))
+                vector = list(item)
+            if vector:
+                vectors.append(vector)
+        if not vectors:
+            raise RuntimeError(
+                f"Local embedder produced no vectors for {len(texts)} texts "
+                f"(model={model_name}, cache_dir={self._cache_dir})"
+            )
+        if len(vectors) != len(texts):
+            raise RuntimeError(
+                f"Local embedder returned {len(vectors)} vectors for {len(texts)} texts "
+                f"(model={model_name}, cache_dir={self._cache_dir})"
+            )
         return {"embeddings": vectors}
 
     async def acall(

@@ -54,3 +54,40 @@ def test_embedding_vector_length_ignores_strings():
     vector_doc = Document(text="x", vector=[0.1, 0.2], meta_data={})
     assert _embedding_vector_length(string_doc) == 0
     assert _embedding_vector_length(vector_doc) == 2
+
+
+def test_raising_embedder_rejects_empty_error_output():
+    from api.rag.pipeline import _RaisingEmbedder
+
+    class Inner:
+        def call(self, input, model_kwargs=None):
+            return SimpleNamespace(
+                data=[],
+                error="onnxruntime session failed",
+                raw_response=None,
+            )
+
+        def __call__(self, text):
+            return self.call(text)
+
+    wrapped = _RaisingEmbedder(Inner())
+    with pytest.raises(EmbeddingFailedError, match="onnxruntime"):
+        wrapped.call(input=["hello"])
+
+
+def test_raising_embedder_returns_vectors():
+    from api.rag.pipeline import _RaisingEmbedder
+
+    class Inner:
+        def call(self, input, model_kwargs=None):
+            return SimpleNamespace(
+                data=[SimpleNamespace(embedding=[0.1, 0.2, 0.3])],
+                error=None,
+            )
+
+        def __call__(self, text):
+            return self.call(text)
+
+    wrapped = _RaisingEmbedder(Inner())
+    output = wrapped.call(input=["hello"])
+    assert output.data[0].embedding == [0.1, 0.2, 0.3]

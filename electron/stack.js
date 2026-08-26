@@ -1,5 +1,5 @@
 const { app } = require('electron');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const {
@@ -16,6 +16,7 @@ const {
   ensureUserData,
   readSettings,
   writeDesktopModelConfig,
+  syncFastembedCache,
 } = require('./paths');
 const { waitHttp, waitTcp, probeHttp, probeTcp } = require('./wait');
 
@@ -79,7 +80,46 @@ function gitExe() {
   return resolveOnPath('git');
 }
 
+function pidsListeningOnPort(port) {
+  if (process.platform !== 'win32') return [];
+  try {
+    const out = execFileSync('netstat', ['-ano', '-p', 'tcp'], {
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+    const pids = new Set();
+    const localPort = new RegExp(`:${port}$`);
+    for (const line of out.split(/\r?\n/)) {
+      if (!/LISTENING/i.test(line)) continue;
+      const cols = line.trim().split(/\s+/);
+      const local = cols[1] || '';
+      if (!localPort.test(local)) continue;
+      const pid = cols[cols.length - 1];
+      if (pid && /^\d+$/.test(pid) && pid !== '0') pids.add(pid);
+    }
+    return [...pids];
+  } catch {
+    return [];
+  }
+}
+
+function killListenerOnPort(port) {
+  for (const pid of pidsListeningOnPort(port)) {
+    if (String(pid) === String(process.pid)) continue;
+    spawn('taskkill', ['/pid', String(pid), '/t', '/f'], {
+      windowsHide: true,
+      stdio: 'ignore',
+    });
+  }
+}
+
 async function isStackReady() {
+  // Packaged builds must spawn their own API so FASTEMBED_CACHE_PATH and
+  // DEEPWIKI_EMBEDDER_TYPE=local are applied. Reusing a leftover :8001
+  // process is what produces empty embeddings in desktop mode.
+  if (app.isPackaged && !apiChild) {
+    return false;
+  }
   const [apiOk, webOk] = await Promise.all([
     probeHttp(`http://127.0.0.1:${API_PORT}/health`),
     probeTcp(FRONTEND_PORT),
@@ -159,6 +199,7 @@ function runtimeEnv(paths) {
   pathParts.push(process.env.PATH || '');
 
   writeDesktopModelConfig(settings.keys || {});
+  syncFastembedCache();
   const env = {
     ...process.env,
     ...(settings.keys || {}),
@@ -171,7 +212,7 @@ function runtimeEnv(paths) {
     TIKTOKEN_CACHE_DIR: path.join(getRuntimeRoot(), 'tiktoken_cache'),
     DEEPWIKI_CONFIG_DIR: paths.configDir,
     DEEPWIKI_EMBEDDER_TYPE: 'local',
-    FASTEMBED_CACHE_PATH: getFastembedCachePath(paths),
+    FASTEMBED_CACHE_PATH: syncFastembedCache(),
     HOME: paths.root,
     USERPROFILE: paths.root,
     PYTHONUTF8: '1',
@@ -192,18 +233,6 @@ function runtimeEnv(paths) {
     env.GIT_PYTHON_GIT_EXECUTABLE = git;
   }
   return env;
-}
-
-function getFastembedCachePath(paths) {
-  const bundled = path.join(getRuntimeRoot(), 'fastembed_cache');
-  if (exists(bundled)) {
-    try {
-      if (fs.readdirSync(bundled).length > 0) return bundled;
-    } catch {
-      // fall through to the user-data cache
-    }
-  }
-  return path.join(paths.root, 'models');
 }
 
 function assertRuntime() {
@@ -312,6 +341,12 @@ async function startStack(emit) {
   if (await isStackReady()) {
     emit?.({ step: 'ready' });
     return;
+  }
+
+  if (app.isPackaged) {
+    killListenerOnPort(API_PORT);
+    killListenerOnPort(FRONTEND_PORT);
+    await sleep(600);
   }
 
   emit?.({ step: 'start-api' });
