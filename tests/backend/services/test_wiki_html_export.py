@@ -113,6 +113,6 @@ def test_html_export_includes_ask_ai_panel():
     assert 'class="ask-fab"' in html
     assert 'class="ask-drawer"' in html
     assert 'class="ask-settings"' in html
-    assert "chat/completions" in html
+    assert "/responses" in html
     assert "localStorage" in html
     assert "deepwiki_ask_cfg" in html

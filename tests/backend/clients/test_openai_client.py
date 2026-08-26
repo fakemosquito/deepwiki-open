@@ -60,38 +60,57 @@ def test_litellm_client_constructs_with_legacy_kwargs(monkeypatch):
     assert client.base_url.rstrip("/").endswith("/v1")
 
 
-def test_llm_kwargs_use_chat_completions_messages(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    client = OpenAIClient(api_key="sk-test", base_url="https://proxy.example/v1")
+def test_litellm_llm_kwargs_still_use_chat_completions(monkeypatch):
+    monkeypatch.setenv("LITELLM_API_KEY", "sk-test")
+    client = LiteLLMClient(api_key="sk-test", base_url="http://localhost:4000")
     kwargs = client.convert_inputs_to_api_kwargs(
         input="hello wiki",
-        model_kwargs={"model": "glm-5.2", "stream": True, "temperature": 0.7},
+        model_kwargs={"model": "openai/gpt-4o", "stream": True, "temperature": 0.7},
         model_type=ModelType.LLM,
     )
     assert kwargs["messages"] == [{"role": "user", "content": "hello wiki"}]
     assert "input" not in kwargs
+
+
+def test_llm_kwargs_use_responses_input(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    client = OpenAIClient(api_key="sk-test", base_url="https://proxy.example/v1")
+    kwargs = client.convert_inputs_to_api_kwargs(
+        input="hello wiki",
+        model_kwargs={
+            "model": "glm-5.2",
+            "stream": True,
+            "temperature": 0.7,
+            "max_tokens": 16,
+        },
+        model_type=ModelType.LLM,
+    )
+    assert kwargs["input"] == "hello wiki"
+    assert "messages" not in kwargs
     assert kwargs["model"] == "glm-5.2"
     assert kwargs["stream"] is True
+    assert kwargs["max_output_tokens"] == 16
+    assert "max_tokens" not in kwargs
 
 
-def test_llm_call_uses_chat_completions_not_responses(monkeypatch):
+def test_llm_call_uses_responses_not_chat_completions(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     client = OpenAIClient(api_key="sk-test", base_url="https://proxy.example/v1")
     captured = {}
 
     def fake_create(**kwargs):
         captured["kwargs"] = kwargs
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))])
+        return SimpleNamespace(output_text="ok")
 
-    monkeypatch.setattr(client.sync_client.chat.completions, "create", fake_create)
+    monkeypatch.setattr(client.sync_client.responses, "create", fake_create)
 
-    def fail_responses(**kwargs):
-        raise AssertionError("LLM calls must not use the Responses API")
+    def fail_chat(**kwargs):
+        raise AssertionError("LLM calls must use the Responses API")
 
-    monkeypatch.setattr(client.sync_client.responses, "create", fail_responses)
+    monkeypatch.setattr(client.sync_client.chat.completions, "create", fail_chat)
 
     client.call(
-        api_kwargs={"model": "glm-5.2", "messages": [{"role": "user", "content": "hi"}]},
+        api_kwargs={"model": "glm-5.2", "input": "hi"},
         model_type=ModelType.LLM,
     )
-    assert captured["kwargs"]["messages"][0]["content"] == "hi"
+    assert captured["kwargs"]["input"] == "hi"

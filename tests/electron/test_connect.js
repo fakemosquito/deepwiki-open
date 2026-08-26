@@ -20,7 +20,7 @@ function json(res, status, body) {
 
 test('chat 200 with embeddings 404 still succeeds for local embedder', async () => {
   const { server, port } = await listen((req, res) => {
-    if (String(req.url).includes('/chat/completions')) {
+    if (String(req.url).includes('/responses')) {
       json(res, 200, { choices: [{ message: { content: 'ok' } }] });
       return;
     }

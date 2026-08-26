@@ -52,13 +52,13 @@ async function postJson({ url, apiKey, body }) {
   }
 }
 
-async function postChat({ url, apiKey, model, extra }) {
+async function postResponse({ url, apiKey, model, extra }) {
   return postJson({
     url,
     apiKey,
     body: {
       model,
-      messages: [{ role: 'user', content: 'ping' }],
+      input: 'ping',
       stream: false,
       ...extra,
     },
@@ -117,17 +117,17 @@ async function testModelConnection(input) {
     return { ok: false, code: 'INVALID_URL' };
   }
 
-  const url = `${baseUrl}/chat/completions`;
+  const url = `${baseUrl}/responses`;
   try {
-    let result = await postChat({
+    let result = await postResponse({
       url,
       apiKey,
       model,
-      extra: { max_tokens: 1 },
+      extra: { max_output_tokens: 1 },
     });
 
     if (result.response.status === 400) {
-      result = await postChat({ url, apiKey, model, extra: {} });
+      result = await postResponse({ url, apiKey, model, extra: {} });
     }
 
     if (!(result.response.ok && !result.data.error)) {

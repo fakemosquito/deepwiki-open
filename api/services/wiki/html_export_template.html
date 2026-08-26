@@ -838,6 +838,7 @@
 
       function normalizeBaseUrl(url) {
         let u = String(url || "").trim().replace(/\/+$/, "");
+        if (u.endsWith("/responses")) u = u.slice(0, -"/responses".length);
         if (u.endsWith("/chat/completions")) u = u.slice(0, -"/chat/completions".length);
         return u.replace(/\/+$/, "");
       }
@@ -951,6 +952,8 @@
             try {
               const json = JSON.parse(payload);
               const delta =
+                (json.type === "response.output_text.delta" && json.delta) ||
+                (typeof json.delta === "string" && json.delta) ||
                 (json.choices && json.choices[0] && json.choices[0].delta && json.choices[0].delta.content) ||
                 (json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) ||
                 "";
@@ -977,7 +980,7 @@
         showError("");
         document.getElementById("ask-test-btn").disabled = true;
         try {
-          const res = await fetch(baseUrl + "/chat/completions", {
+          const res = await fetch(baseUrl + "/responses", {
             method: "POST",
             headers: {
               Authorization: "Bearer " + apiKey,
@@ -985,8 +988,8 @@
             },
             body: JSON.stringify({
               model: model,
-              messages: [{ role: "user", content: "ping" }],
-              max_tokens: 8,
+              input: "ping",
+              max_output_tokens: 8,
               stream: false,
             }),
           });
@@ -1024,7 +1027,7 @@
         conversation.push({ role: "user", content: question });
 
         const { system } = buildContext(cfg);
-        const payloadMessages = [
+        const payloadInput = [
           { role: "system", content: system },
           ...conversation.map((m) => ({ role: m.role, content: m.content })),
         ];
@@ -1037,7 +1040,7 @@
 
         try {
           const baseUrl = normalizeBaseUrl(cfg.baseUrl);
-          const res = await fetch(baseUrl + "/chat/completions", {
+          const res = await fetch(baseUrl + "/responses", {
             method: "POST",
             headers: {
               Authorization: "Bearer " + cfg.apiKey,
@@ -1045,7 +1048,7 @@
             },
             body: JSON.stringify({
               model: cfg.model,
-              messages: payloadMessages,
+              input: payloadInput,
               stream: true,
             }),
             signal: abortController.signal,

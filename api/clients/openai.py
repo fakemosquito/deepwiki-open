@@ -31,12 +31,21 @@ def _is_llm(model_type: ModelType | None) -> bool:
     return model_type in _LLM_TYPES
 
 
-class OpenAIClient(AdalOpenAIClient):
-    """OpenAI-compatible client that honors OPENAI_BASE_URL and OPENAI_API_KEY.
+def _llm_input_payload(input: Any, api_kwargs: Dict) -> Any:
+    if isinstance(input, str):
+        return input
+    if isinstance(input, Sequence) and not isinstance(input, (str, bytes)):
+        return list(input)
+    if input is None:
+        return api_kwargs.get("input") or api_kwargs.get("messages") or []
+    return str(input)
 
-    Recent adalflow builds call the Responses API (`/v1/responses`). Desktop
-    gateways (and the connection test) expose Chat Completions instead, so this
-    subclass keeps LLM calls on `chat.completions.create`.
+
+class OpenAIClient(AdalOpenAIClient):
+    """OpenAI client that honors OPENAI_BASE_URL and OPENAI_API_KEY.
+
+    LLM calls use the Responses API (`/v1/responses`) via `responses.create`.
+    Embeddings still go through the standard embeddings endpoint.
     """
 
     def __init__(
@@ -82,16 +91,12 @@ class OpenAIClient(AdalOpenAIClient):
             )
 
         api_kwargs = dict(model_kwargs)
-        if isinstance(input, str):
-            messages = [{"role": "user", "content": input}]
-        elif isinstance(input, Sequence) and not isinstance(input, (str, bytes)):
-            messages = list(input)
-        elif input is None:
-            messages = list(api_kwargs.get("messages") or [])
+        if "max_tokens" in api_kwargs and "max_output_tokens" not in api_kwargs:
+            api_kwargs["max_output_tokens"] = api_kwargs.pop("max_tokens")
         else:
-            messages = [{"role": "user", "content": str(input)}]
-        api_kwargs["messages"] = messages
-        api_kwargs.pop("input", None)
+            api_kwargs.pop("max_tokens", None)
+        api_kwargs["input"] = _llm_input_payload(input, api_kwargs)
+        api_kwargs.pop("messages", None)
         return api_kwargs
 
     @backoff.on_exception(backoff.expo, _RETRYABLE, max_time=5)
@@ -99,7 +104,7 @@ class OpenAIClient(AdalOpenAIClient):
         api_kwargs = api_kwargs or {}
         if not _is_llm(model_type):
             return super().call(api_kwargs=api_kwargs, model_type=model_type)
-        return self.sync_client.chat.completions.create(**api_kwargs)
+        return self.sync_client.responses.create(**api_kwargs)
 
     @backoff.on_exception(backoff.expo, _RETRYABLE, max_time=5)
     async def acall(self, api_kwargs: Dict = None, model_type: ModelType = None):
@@ -108,4 +113,4 @@ class OpenAIClient(AdalOpenAIClient):
             return await super().acall(api_kwargs=api_kwargs, model_type=model_type)
         if self.async_client is None:
             self.async_client = self.init_async_client()
-        return await self.async_client.chat.completions.create(**api_kwargs)
+        return await self.async_client.responses.create(**api_kwargs)

@@ -91,7 +91,7 @@ async def test_openai_streamer_ignores_response_created_then_yields_text():
 
     class _Client:
         def convert_inputs_to_api_kwargs(self, input, model_kwargs, model_type):
-            return {"model": "glm-5.2", "messages": [{"role": "user", "content": input}]}
+            return {"model": "glm-5.2", "input": input}
 
         async def acall(self, api_kwargs, model_type):
             async def _gen():
